@@ -30,6 +30,7 @@ void OnLowMemory(void);
  */
 void android_main(struct android_app* state)
 {
+    Log::TAG = "vulkan";
     unique_ptr<EventLoop> loop(new EventLoop(state));
     loop->onActivate = OnActivate;
     loop->onDeactivate = OnDeactivate;
