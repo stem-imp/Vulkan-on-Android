@@ -1,8 +1,10 @@
 #include "event_loop.hpp"
 #include "log.hpp"
 
-EventLoop::EventLoop(android_app* application):
-        _application(application),
+using AndroidNative::EventLoop;
+
+EventLoop::EventLoop(android_app* app):
+        _application(app),
         _enabled(false),
         _quit(false)
 {

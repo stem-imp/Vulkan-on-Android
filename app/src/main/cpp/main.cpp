@@ -3,6 +3,8 @@
 #include <memory>
 
 using std::unique_ptr;
+using AndroidNative::EventLoop;
+using AndroidNative::Log;
 
 static status OnActivate();
 static void OnDeactivate();
@@ -30,7 +32,7 @@ static void OnLowMemory(void);
  */
 void android_main(struct android_app* state)
 {
-    Log::TAG = "vulkan";
+    Log::Tag = "vulkan";
     unique_ptr<EventLoop> loop(new EventLoop(state));
     loop->onActivate = OnActivate;
     loop->onDeactivate = OnDeactivate;
@@ -56,77 +58,77 @@ void android_main(struct android_app* state)
 
 static status OnActivate()
 {
-    Log::Info("App OnActivate");
+    DebugLog("App OnActivate");
     return OK;
 }
 
 static void OnDeactivate()
 {
-    Log::Info("App OnDeactivate");
+    DebugLog("App OnDeactivate");
 }
 
 status OnStep()
 {
-    Log::Info("App OnStep");
+    DebugLog("App OnStep");
     return OK;
 }
 
 void OnStart(void)
 {
-    Log::Info("App OnStart");
+    DebugLog("App OnStart");
 }
 
 void OnResume(void)
 {
-    Log::Info("App OnResume");
+    DebugLog("App OnResume");
 }
 
 void OnPause(void)
 {
-    Log::Info("App OnPause");
+    DebugLog("App OnPause");
 }
 
 void OnStop(void)
 {
-    Log::Info("App OnStop");
+    DebugLog("App OnStop");
 }
 
 void OnDestroy(void)
 {
-    Log::Info("App OnDestroy");
+    DebugLog("App OnDestroy");
 }
 
 void OnInitWindow(android_app* app)
 {
-    Log::Info("App OnInitWindow");
+    DebugLog("App OnInitWindow");
 }
 
 void OnTermWindow(void)
 {
-    Log::Info("App OnTermWindow");
+    DebugLog("App OnTermWindow");
 }
 
 void OnGainFocus(void)
 {
-    Log::Info("App OnGainFocus");
+    DebugLog("App OnGainFocus");
 }
 
 void OnLostFocus(void)
 {
-    Log::Info("App OnLostFocus");
+    DebugLog("App OnLostFocus");
 }
 
 void OnSaveInstanceState(void**, size_t*)
 {
-    Log::Info("App OnSaveInstanceState");
+    DebugLog("App OnSaveInstanceState");
 }
 
 void OnConfigurationChanged(void)
 {
-    Log::Info("App OnConfigurationChanged");
+    DebugLog("App OnConfigurationChanged");
 }
 
 void OnLowMemory(void)
 {
-    Log::Info("App OnLowMemory");
+    DebugLog("App OnLowMemory");
 }

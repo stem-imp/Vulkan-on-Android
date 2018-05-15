@@ -5,21 +5,23 @@
 
 using std::string;
 
-class Log
-{
-public:
-    static string TAG;
+namespace AndroidNative {
+    class Log
+    {
+    public:
+        static string Tag;
 
-    static void Error(const char* message, ...);
-    static void Warn(const char* message, ...);
-    static void Info(const char* message, ...);
-    static void Debug(const char* message, ...);
-};
+        static void Error(const char *message, ...);
+        static void Warn(const char *message, ...);
+        static void Info(const char *message, ...);
+        static void Debug(const char *message, ...);
+    };
+}
 
 #ifndef NDEBUG
-#define app_log(...) Log::Debug(__VA_ARGS__)
+#define DebugLog(...) Log::Debug(__VA_ARGS__)
 #else
-#define app_log(...)
+#define DebugLog(...)
 #endif
 
 #endif // ANDROID_LOG_HPP
