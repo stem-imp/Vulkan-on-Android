@@ -20,7 +20,7 @@ public:
 
     function<void(void)> onStart;
     function<void(void)> onResume;
-    function<void(void)> onInitWindow;
+    function<void(android_app*)> onInitWindow;
     function<void(void)> onGainFocus;
 
     function<void(void)> onPause;
@@ -36,9 +36,9 @@ private:
     void Activate();
     void Deactivate();
 
-    void ProcessAppEvent(int32_t command);
+    void ProcessAppEvent(android_app* app, int32_t command);
 
-    static void AppEvent(android_app* application, int32_t command);
+    static void AppEvent(android_app* app, int32_t command);
 
     android_app* _application;
     bool _enabled;

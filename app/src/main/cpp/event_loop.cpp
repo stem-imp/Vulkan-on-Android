@@ -64,13 +64,13 @@ void EventLoop::Deactivate()
     }
 }
 
-void EventLoop::AppEvent(android_app *application, int32_t command)
+void EventLoop::AppEvent(android_app* app, int32_t command)
 {
-    EventLoop& eventLoop = *(EventLoop*)application->userData;
-    eventLoop.ProcessAppEvent(command);
+    EventLoop& eventLoop = *(EventLoop*)app->userData;
+    eventLoop.ProcessAppEvent(app, command);
 }
 
-void EventLoop::ProcessAppEvent(int32_t command)
+void EventLoop::ProcessAppEvent(android_app* app, int32_t command)
 {
     switch (command) {
         case APP_CMD_START:
@@ -85,7 +85,7 @@ void EventLoop::ProcessAppEvent(int32_t command)
             break;
         case APP_CMD_INIT_WINDOW:
             if (onInitWindow != nullptr) {
-                onInitWindow();
+                onInitWindow(app);
             }
             break;
         case APP_CMD_GAINED_FOCUS:

@@ -4,24 +4,24 @@
 
 using std::unique_ptr;
 
-status OnActivate();
-void OnDeactivate();
-status OnStep();
+static status OnActivate();
+static void OnDeactivate();
+static status OnStep();
 
-void OnStart(void);
-void OnResume(void);
-void OnPause(void);
-void OnStop(void);
-void OnDestroy(void);
+static void OnStart(void);
+static void OnResume(void);
+static void OnPause(void);
+static void OnStop(void);
+static void OnDestroy(void);
 
-void OnInitWindow(void);
-void OnTermWindow(void);
-void OnGainFocus(void);
-void OnLostFocus(void);
+static void OnInitWindow(android_app* app);
+static void OnTermWindow(void);
+static void OnGainFocus(void);
+static void OnLostFocus(void);
 
-void OnSaveInstanceState(void**, size_t*);
-void OnConfigurationChanged(void);
-void OnLowMemory(void);
+static void OnSaveInstanceState(void**, size_t*);
+static void OnConfigurationChanged(void);
+static void OnLowMemory(void);
 
 /**
  * This is the main entry point of a native application that is using
@@ -54,13 +54,13 @@ void android_main(struct android_app* state)
     loop->Run();
 }
 
-status OnActivate()
+static status OnActivate()
 {
     Log::Info("App OnActivate");
     return OK;
 }
 
-void OnDeactivate()
+static void OnDeactivate()
 {
     Log::Info("App OnDeactivate");
 }
@@ -96,7 +96,7 @@ void OnDestroy(void)
     Log::Info("App OnDestroy");
 }
 
-void OnInitWindow(void)
+void OnInitWindow(android_app* app)
 {
     Log::Info("App OnInitWindow");
 }
