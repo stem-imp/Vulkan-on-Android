@@ -54,6 +54,12 @@ target_link_libraries( # Specifies the target library.
                        # included in the NDK.
                        ${log-lib} )
 
+set(VULKAN_INCLUDE_DIR ${ANDROID_NDK}/sources/third_party/vulkan/src/include)
+set(VULKAN_COMMON_DIR ${ANDROID_NDK}/sources/third_party/vulkan/src/common)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_DEBUG_EXTENTIONS -DVK_USE_PLATFORM_ANDROID_KHR")
+include_directories(${VULKAN_INCLUDE_DIR})
+include_directories(${VULKAN_COMMON_DIR})
+
 add_library( # Sets the name of the library.
              main
 
@@ -61,6 +67,8 @@ add_library( # Sets the name of the library.
              SHARED
 
              # Provides a relative path to your source file(s).
+             ${VULKAN_COMMON_DIR}/vulkan_wrapper.cpp
+             src/main/cpp/layer_extension.cpp
              src/main/cpp/event_loop.cpp
              src/main/cpp/main.cpp )
 

@@ -2,8 +2,11 @@
 #define ANDROID_LOG_HPP
 
 #include <string>
+#include <stdexcept>
 
 using std::string;
+using std::to_string;
+using std::runtime_error;
 
 namespace AndroidNative {
     class Log
@@ -23,5 +26,7 @@ namespace AndroidNative {
 #else
 #define DebugLog(...)
 #endif
+
+#define InfoLog(...) Log::Info(__VA_ARGS__)
 
 #endif // ANDROID_LOG_HPP
