@@ -5,15 +5,20 @@
 using AndroidNative::Log;
 using std::swap;
 
-static const char* UNIQUE_OBJECT_LAYER = "VK_LAYER_GOOGLE_unique_objects";
-static const char* GOOGLE_THREADING_LAYER = "VK_LAYER_GOOGLE_threading";
+const char* LayerAndExtension::UNIQUE_OBJECT_LAYER = "VK_LAYER_GOOGLE_unique_objects";
+const char* LayerAndExtension::GOOGLE_THREADING_LAYER = "VK_LAYER_GOOGLE_threading";
+const char* LayerAndExtension::CORE_VALIDATION_LAYER = "VK_LAYER_LUNARG_core_validation";
+const char* LayerAndExtension::OBJECT_TRACKER_LAYER = "VK_LAYER_LUNARG_object_tracker";
+const char* LayerAndExtension::SWAPCHAIN_LAYER = "VK_LAYER_LUNARG_swapchain";
+const char* LayerAndExtension::IMAGE_LAYER = "VK_LAYER_LUNARG_image";
+const char* LayerAndExtension::PARAMETER_VALIDATION_LAYER = "VK_LAYER_LUNARG_parameter_validation";
 // Debug Extension names in use.
 // assumed usage:
 //   1) app calls GetDebugExtensionName()
 //   2) app calls IsInstanceExtensionSupported() to make sure it is supported
 //   3) app tucks dbg extension name into InstanceCreateInfo to create instance
 //   4) app calls HookDebugReportExtension() to hook up debug print message
-static const char* DEBUG_EXTENSION_NAME = "VK_EXT_debug_report";
+const char* LayerAndExtension::DEBUG_EXTENSION_NAME = "VK_EXT_debug_report";
 
 static VkBool32 VKAPI_PTR VKDebugReportCallbackEXImplementation(
         VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objectType,
@@ -21,34 +26,36 @@ static VkBool32 VKAPI_PTR VKDebugReportCallbackEXImplementation(
         const char *layerPrefix, const char *pMessage, void *userData
 );
 
-LayerAndExtension::LayerAndExtension(void)
+LayerAndExtension::LayerAndExtension(void) :
+#ifdef NDEBUG
+    enableValidationLayers(false),
+#else
+    enableValidationLayers(true),
+#endif
+    _instance(VK_NULL_HANDLE), _debugCallbackHandle(VK_NULL_HANDLE)
 {
-    _instance = VK_NULL_HANDLE;
-    _debugCallbackHandle = VK_NULL_HANDLE;
-    VkResult result = vkEnumerateInstanceLayerProperties(&_instanceLayerCount, nullptr);
+    uint32_t instanceLayerCount;
+    VkResult result = vkEnumerateInstanceLayerProperties(&instanceLayerCount, nullptr);
     if (result != VK_SUCCESS) {
-        if (result != VK_SUCCESS) {
-            string code = to_string(result);
-            throw runtime_error("vkEnumerateInstanceLayerProperties: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
-        }
+        string code = to_string(result);
+        throw runtime_error("vkEnumerateInstanceLayerProperties: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
     }
 
-    if (_instanceLayerCount) {
-        _instanceLayerProperties = new VkLayerProperties[_instanceLayerCount];
-        assert(_instanceLayerProperties);
-        result = vkEnumerateInstanceLayerProperties(&_instanceLayerCount, _instanceLayerProperties);
+    if (instanceLayerCount) {
+        _instanceLayerProperties = new VkLayerProperties[instanceLayerCount];
+        result = vkEnumerateInstanceLayerProperties(&instanceLayerCount, _instanceLayerProperties);
         if (result != VK_SUCCESS) {
             string code = to_string(result);
             throw runtime_error("vkEnumerateInstanceLayerProperties: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
         }
     }
-    for (uint32_t i = 0; i < _instanceLayerCount; i++) {
-        _instanceLayers.push_back(_instanceLayerProperties[i].layerName);
+    for (uint32_t i = 0; i < instanceLayerCount; i++) {
+        _instanceLayerNames.push_back(_instanceLayerProperties[i].layerName);
         DebugLog("Instance Layer Name: %s", _instanceLayerProperties[i].layerName);
     }
-    CheckLayerLoadingSequence(&_instanceLayers);
+    CheckLayerLoadingSequence(&_instanceLayerNames);
 
-    InitializeInstanceExtensions();
+    EnumerateInstanceAndLayerExtensions();
 }
 
 void LayerAndExtension::CheckLayerLoadingSequence(vector<char*>* layerPtr)
@@ -77,27 +84,31 @@ void LayerAndExtension::CheckLayerLoadingSequence(vector<char*>* layerPtr)
     }
 }
 
-bool LayerAndExtension::InitializeInstanceExtensions()
+bool LayerAndExtension::EnumerateInstanceAndLayerExtensions()
 {
-    ExtensionInfo extInfo{0, nullptr};
+    ExtensionInfo extInfo = { 0, nullptr };
     VkResult result = vkEnumerateInstanceExtensionProperties(nullptr, &extInfo.count, nullptr);
     if (result != VK_SUCCESS) {
         string code = to_string(result);
         throw runtime_error("vkEnumerateInstanceExtensionProperties: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
     }
+
+    vector<ExtensionInfo> _instanceExtensions;//.clear();
     DebugLog("%d instance extension properties.", extInfo.count);
     if (extInfo.count) {
-        extInfo.prop = new VkExtensionProperties[extInfo.count];
-        assert(extInfo.prop);
-        result = vkEnumerateInstanceExtensionProperties(nullptr, &extInfo.count, extInfo.prop);
+        extInfo.properties = new VkExtensionProperties[extInfo.count];
+        result = vkEnumerateInstanceExtensionProperties(nullptr, &extInfo.count, extInfo.properties);
         if (result != VK_SUCCESS) {
             string code = to_string(result);
             throw runtime_error("vkEnumerateInstanceExtensionProperties: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
         }
-        _instanceExtensionProperties.push_back(extInfo);
+        for (int i = 0; i < extInfo.count; i++) {
+            DebugLog("  Extension name: %s", extInfo.properties[i].extensionName);
+        }
+        _instanceExtensions.push_back(extInfo);
     }
 
-    for (int i = 0; i < _instanceLayerCount; i++) {
+    for (int i = 0; i < _instanceLayerNames.size(); i++) {
         extInfo.count = 0;
         result = vkEnumerateInstanceExtensionProperties(_instanceLayerProperties[i].layerName, &extInfo.count, nullptr);
         if (result != VK_SUCCESS) {
@@ -109,19 +120,22 @@ bool LayerAndExtension::InitializeInstanceExtensions()
             continue;
         }
 
-        extInfo.prop = new VkExtensionProperties[extInfo.count];
-        DebugLog("Filling instance extension properties for layer %s.", _instanceLayerProperties[i].layerName);
-        result = vkEnumerateInstanceExtensionProperties(_instanceLayerProperties[i].layerName, &extInfo.count, extInfo.prop);
+        extInfo.properties = new VkExtensionProperties[extInfo.count];
+        result = vkEnumerateInstanceExtensionProperties(_instanceLayerProperties[i].layerName, &extInfo.count, extInfo.properties);
         if (result != VK_SUCCESS) {
             string code = to_string(result);
             throw runtime_error("vkEnumerateInstanceExtensionProperties: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
         }
-        _instanceExtensionProperties.push_back(extInfo);
+        for (int i = 0; i < extInfo.count; i++) {
+            DebugLog("  Extension name: %s", extInfo.properties[i].extensionName);
+        }
+        _instanceExtensions.push_back(extInfo);
     }
-    return InitializeExtensionNames(_instanceExtensionProperties, &_instanceExtensions);
+    _instanceExtensionNames.clear();
+    return PickUniqueExtensionNames(_instanceExtensions, &_instanceExtensionNames);
 }
 
-bool LayerAndExtension::InitializeExtensionNames(const vector<ExtensionInfo>& prop, vector<char*>* names)
+bool LayerAndExtension::PickUniqueExtensionNames(const vector<ExtensionInfo> &prop, vector<char *> *names)
 {
     names->clear();
     for (auto& ext : prop) {
@@ -129,7 +143,7 @@ bool LayerAndExtension::InitializeExtensionNames(const vector<ExtensionInfo>& pr
             // skip the one already inside
             bool duplicate = false;
             for (uint32_t j = 0; j < names->size(); ++j) {
-                if (!strcmp(ext.prop[i].extensionName, (*names)[j])) {
+                if (!strcmp(ext.properties[i].extensionName, (*names)[j])) {
                     duplicate = true;
                     break;
                 }
@@ -138,8 +152,8 @@ bool LayerAndExtension::InitializeExtensionNames(const vector<ExtensionInfo>& pr
                 continue;
             }
             // save this unique one
-            names->push_back(ext.prop[i].extensionName);
-            DebugLog("Extension Name: %s", ext.prop[i].extensionName);
+            names->push_back(ext.properties[i].extensionName);
+            DebugLog("Unique extension name: %s", ext.properties[i].extensionName);
         }
     }
     return true;
@@ -150,70 +164,114 @@ LayerAndExtension::~LayerAndExtension()
     if (_instanceLayerProperties) {
         delete[] _instanceLayerProperties;
     }
-    for (auto ext : _instanceExtensionProperties) {
-        delete[] ext.prop;
-    }
     if (_debugCallbackHandle) {
         vkDestroyDebugReportCallbackEXT(_instance, _debugCallbackHandle, nullptr);
+        vkCreateDebugReportCallbackEXT = nullptr;
     }
 }
 
-uint32_t LayerAndExtension::InstanceLayerCount(void)
+bool LayerAndExtension::EnableInstanceLayers(const vector<const char*>& layerNames)
 {
-    size_t size = _instanceLayers.size();
-    //assert(size == _instanceLayerCount - 1); // except VK_LAYER_GOOGLE_unique_objects
-    DebugLog("%d instance layers", size);
-    return size;
-}
-
-char** LayerAndExtension::InstanceLayerNames()
-{
-    if (_instanceLayers.size()) {
-        return _instanceLayers.data();
-    }
-    return nullptr;
-}
-
-uint32_t LayerAndExtension::InstanceExtensionCount(void)
-{
-    DebugLog("%d instance extensions.", static_cast<uint32_t>(_instanceExtensions.size()));
-    return static_cast<uint32_t>(_instanceExtensions.size());
-}
-
-char** LayerAndExtension::InstanceExtensionNames(void)
-{
-    if (_instanceExtensions.size()) {
-        return _instanceExtensions.data();
-    }
-    return nullptr;
-}
-
-bool LayerAndExtension::AddInstanceExtension(const char *extName)
-{
-    if (!extName) {
+    if (!layerNames.size() || !enableValidationLayers) {
         return false;
     }
 
-    // enable all available extensions, plus the one asked
-    if (!IsInstanceExtensionSupported(extName)) {
-#ifdef ENABLE_NON_ENUMERATED_EXT
-        _instanceExtensions.push_back(static_cast<char*>(extName));
-        return true;
-#else
-        return false;
-#endif
+    _instanceLayerNamesEnabled.clear();
+    int i = 0;
+    for (; i < layerNames.size(); i++) {
+        if (IsInstanceLayerSupported(layerNames[i])) {
+            _instanceLayerNamesEnabled.push_back(static_cast<const char*>(layerNames[i]));
+        } else {
+            _instanceLayerNamesEnabled.clear();
+            break;
+        }
     }
-    return true;
+    return (i == layerNames.size());
 }
 
-bool LayerAndExtension::IsInstanceExtensionSupported(const char *extName)
+bool LayerAndExtension::IsInstanceLayerSupported(const char* layerName)
 {
-    for (auto name : _instanceExtensions) {
-        if (!strcmp(name, extName)) {
+    for (auto name : _instanceLayerNames) {
+        if (!strcmp(name, layerName)) {
             return true;
         }
     }
     return false;
+}
+
+bool LayerAndExtension::EnableInstanceExtensions(const vector<const char*>& extensionNames)
+{
+    if (!extensionNames.size()) {
+        return false;
+    }
+
+    if (!enableValidationLayers) {
+        for (auto name : extensionNames) {
+            if (!strcmp(name, DEBUG_EXTENSION_NAME)) {
+                return false;
+            }
+        }
+    }
+
+    _instanceExtensionNamesEnabled.clear();
+    int i = 0;
+    for (; i < extensionNames.size(); i++) {
+        if (IsInstanceExtensionSupported(extensionNames[i])) {
+            _instanceExtensionNamesEnabled.push_back(static_cast<const char*>(extensionNames[i]));
+        } else {
+#ifdef ENABLE_NON_ENUMERATED_EXT
+            _instanceExtensionNamesEnabled.push_back(static_cast<char*>(extensionNames[i]));
+            break;
+#else
+            break;
+#endif
+        }
+    }
+    return (i == extensionNames.size());
+}
+
+bool LayerAndExtension::IsInstanceExtensionSupported(const char* extensionName)
+{
+    for (auto name : _instanceExtensionNames) {
+        if (!strcmp(name, extensionName)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+uint32_t LayerAndExtension::InstanceLayerEnabledCount(void) const
+{
+    DebugLog("%d enabled instance layers.", _instanceLayerNamesEnabled.size());
+    return static_cast<uint32_t>(_instanceLayerNamesEnabled.size());
+}
+
+const char* const* LayerAndExtension::InstanceLayerNamesEnabled(void) const
+{
+    if (_instanceLayerNamesEnabled.size()) {
+        for (auto name : _instanceLayerNamesEnabled) {
+            DebugLog("  %s enabled", name);
+        }
+        return _instanceLayerNamesEnabled.data();
+    }
+    return nullptr;
+}
+
+uint32_t LayerAndExtension::InstanceExtensionEnabledCount(void) const
+{
+    DebugLog("%d enabled instance extensions.", _instanceExtensionNamesEnabled.size());
+    return static_cast<uint32_t>(_instanceExtensionNamesEnabled.size());
+}
+
+const char* const* LayerAndExtension::InstanceExtensionNamesEnabled(void) const
+{
+    if (_instanceExtensionNamesEnabled.size()) {
+        for (auto name : _instanceExtensionNamesEnabled) {
+            DebugLog("  %s enabled", name);
+        }
+        return _instanceExtensionNamesEnabled.data();
+    }
+    return nullptr;
 }
 
 bool LayerAndExtension::HookDebugReportExtension(VkInstance instance)
@@ -223,25 +281,21 @@ bool LayerAndExtension::HookDebugReportExtension(VkInstance instance)
         return false;
     }
     if (!vkCreateDebugReportCallbackEXT) {
-        vkCreateDebugReportCallbackEXT =
-                (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(
-                        instance, "vkCreateDebugReportCallbackEXT");
-        vkDestroyDebugReportCallbackEXT =
-                (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(
-                        instance, "vkDestroyDebugReportCallbackEXT");
-        vkDebugReportMessageEXT =
-                (PFN_vkDebugReportMessageEXT)vkGetInstanceProcAddr(
-                        instance, "vkDebugReportMessageEXT");
+        vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
+        vkDestroyDebugReportCallbackEXT = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
+        vkDebugReportMessageEXT = (PFN_vkDebugReportMessageEXT)vkGetInstanceProcAddr(instance, "vkDebugReportMessageEXT");
     }
 
     VkDebugReportCallbackCreateInfoEXT dbgInfo = {
-            .sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT,
-            .pNext = nullptr,
-            .flags = VK_DEBUG_REPORT_WARNING_BIT_EXT |
-                     VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
-                     VK_DEBUG_REPORT_ERROR_BIT_EXT,
-            .pfnCallback = VKDebugReportCallbackEXImplementation,
-            .pUserData = this,  // we provide the debug object as context
+        .sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT,
+        .pNext = nullptr,
+        .flags = //VK_DEBUG_REPORT_INFORMATION_BIT_EXT |
+                VK_DEBUG_REPORT_WARNING_BIT_EXT |
+                VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
+                VK_DEBUG_REPORT_ERROR_BIT_EXT |
+                VK_DEBUG_REPORT_DEBUG_BIT_EXT,
+        .pfnCallback = VKDebugReportCallbackEXImplementation,
+        .pUserData = this,  // we provide the debug object as context
     };
     VkResult result = vkCreateDebugReportCallbackEXT(instance, &dbgInfo, nullptr, &_debugCallbackHandle);
     if (result != VK_SUCCESS) {
@@ -280,25 +334,24 @@ static VkBool32 VKAPI_PTR VKDebugReportCallbackEXImplementation(
     return VK_FALSE;
 }
 
-void LayerAndExtension::InitializeDeviceLayersAndExtensions(VkPhysicalDevice physicalDevice)
+void LayerAndExtension::EnumerateDeviceLayersAndExtensions(VkPhysicalDevice physicalDevice)
 {
     _physicalDev = physicalDevice;
-    if (_physicalDev == VK_NULL_HANDLE) {
+    if (physicalDevice == VK_NULL_HANDLE) {
         return;
     }
 
-    // get all supported layers props
-    _deviceLayerCount = 0;
-    VkResult result = vkEnumerateDeviceLayerProperties(_physicalDev, &_deviceLayerCount, nullptr);
-    if (result == VK_SUCCESS) {
+    uint32_t deviceLayerCount;
+    VkResult result = vkEnumerateDeviceLayerProperties(physicalDevice, &deviceLayerCount, nullptr);
+    if (result != VK_SUCCESS) {
         string code = to_string(result);
         throw runtime_error("vkEnumerateDeviceLayerProperties: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
     }
-    DebugLog("%d device layer properties.", _deviceLayerCount);
-    if (_deviceLayerCount) {
-        _deviceLayerProperties = new VkLayerProperties[_deviceLayerCount];
-        assert(_deviceLayerProperties);
-        result = vkEnumerateDeviceLayerProperties(_physicalDev, &_deviceLayerCount, _deviceLayerProperties);
+    DebugLog("%d device layer properties.", deviceLayerCount);
+    VkLayerProperties* deviceLayerProperties;
+    if (deviceLayerCount) {
+        deviceLayerProperties = new VkLayerProperties[deviceLayerCount];
+        result = vkEnumerateDeviceLayerProperties(physicalDevice, &deviceLayerCount, deviceLayerProperties);
         if (result != VK_SUCCESS) {
             string code = to_string(result);
             throw runtime_error("vkEnumerateDeviceLayerProperties: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
@@ -309,94 +362,127 @@ void LayerAndExtension::InitializeDeviceLayersAndExtensions(VkPhysicalDevice phy
     // validation layer for device only report out for one layer,
     // but it seems we could ask for all layers that asked for instance
     // so we just add them all in brutally
-    // assume all device layers are also implemented for device layers
-    if (_deviceLayerCount == 1) {
+    // assume all instance layers are also implemented for device layers
+    if (deviceLayerCount == 1) {
         DebugLog("Only Reported One layer for device");
-        if (_deviceLayerProperties) {
-            delete[] _deviceLayerProperties;
+        if (deviceLayerProperties) {
+            delete[] deviceLayerProperties;
         }
-        _deviceLayerProperties =(_instanceLayerCount ? (new VkLayerProperties[_instanceLayerCount]) : nullptr);
-        memcpy(_deviceLayerProperties, _instanceLayerProperties, _instanceLayerCount * sizeof(VkLayerProperties));
-        _deviceLayerCount = _instanceLayerCount;
+        size_t size = _instanceLayerNames.size();
+        deviceLayerProperties = (size ? (new VkLayerProperties[size]) : nullptr);
+        memcpy(deviceLayerProperties, _instanceLayerProperties, size * sizeof(VkLayerProperties));
+        deviceLayerCount = size;
     }
 #endif
 
-    for (int i = 0; i < _deviceLayerCount; i++) {
-        if (!strcmp(_deviceLayerProperties[i].layerName, UNIQUE_OBJECT_LAYER)) {
-            continue;
-        }
-        DebugLog("deviceLayerName: %s", _deviceLayerProperties[i].layerName);
-        _deviceLayers.push_back(_deviceLayerProperties[i].layerName);
+    vector<char*> deviceLayerNames;
+    for (int i = 0; i < deviceLayerCount; i++) {
+        DebugLog("Device layer name: %s", deviceLayerProperties[i].layerName);
+        deviceLayerNames.push_back(deviceLayerProperties[i].layerName);
     }
-    CheckLayerLoadingSequence(&_deviceLayers);
+    CheckLayerLoadingSequence(&deviceLayerNames);
 
-    ExtensionInfo ext{0, nullptr};
-    result = vkEnumerateDeviceExtensionProperties(_physicalDev, nullptr, &ext.count, nullptr);
+    ExtensionInfo extInfo = { 0, nullptr };
+    result = vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extInfo.count, nullptr);
     if (result != VK_SUCCESS) {
         string code = to_string(result);
         throw runtime_error("vkEnumerateDeviceExtensionProperties: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
     }
-    DebugLog("%d device extension properties.", ext.count);
-    if (ext.count) {
-        ext.prop = new VkExtensionProperties[ext.count];
-        assert(ext.prop);
-        result = vkEnumerateDeviceExtensionProperties(_physicalDev, nullptr, &ext.count, ext.prop);
+    DebugLog("%d device extension properties.", extInfo.count);
+    vector<ExtensionInfo> _deviceExtensions;
+    if (extInfo.count) {
+        extInfo.properties = new VkExtensionProperties[extInfo.count];
+        result = vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extInfo.count, extInfo.properties);
         if (result != VK_SUCCESS) {
             string code = to_string(result);
             throw runtime_error("vkEnumerateDeviceExtensionProperties: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
         }
-        _deviceExtensionProperties.push_back(ext);
+        _deviceExtensions.push_back(extInfo);
     }
-    for (int i = 0; i < _deviceLayerCount; i++) {
-        ext.count = 0;
-        result = vkEnumerateDeviceExtensionProperties(_physicalDev, _deviceLayerProperties[i].layerName, &ext.count, nullptr);
+    for (int i = 0; i < deviceLayerCount; i++) {
+        extInfo.count = 0;
+        result = vkEnumerateDeviceExtensionProperties(physicalDevice, deviceLayerProperties[i].layerName, &extInfo.count, nullptr);
         if (result != VK_SUCCESS) {
             string code = to_string(result);
             throw runtime_error("vkEnumerateDeviceExtensionProperties: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
         }
-        DebugLog("%s has %d device extension properties.", _deviceLayerProperties[i].layerName, ext.count);
-        if (ext.count) {
-            ext.prop = new VkExtensionProperties[ext.count];
-            assert(ext.prop);
-            DebugLog("Filling device extension properties for layer %s.", _instanceLayerProperties[i].layerName);
-            result = vkEnumerateDeviceExtensionProperties(_physicalDev, _deviceLayerProperties[i].layerName, &ext.count, nullptr);
+        DebugLog("%s has %d device extension properties.", deviceLayerProperties[i].layerName, extInfo.count);
+        if (extInfo.count) {
+            extInfo.properties = new VkExtensionProperties[extInfo.count];
+            result = vkEnumerateDeviceExtensionProperties(physicalDevice, deviceLayerProperties[i].layerName, &extInfo.count, nullptr);
             if (result != VK_SUCCESS) {
                 string code = to_string(result);
                 throw runtime_error("vkEnumerateDeviceExtensionProperties: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
             }
-            _deviceExtensionProperties.push_back(ext);
+            for (int i = 0; i < extInfo.count; i++) {
+                DebugLog("  Extension name: %s", extInfo.properties[i].extensionName);
+            }
+            _deviceExtensions.push_back(extInfo);
         }
     }
-
-    InitializeExtensionNames(_deviceExtensionProperties, &_deviceExtensions);
+    _deviceExtensionNames.clear();
+    PickUniqueExtensionNames(_deviceExtensions, &_deviceExtensionNames);
 }
 
-uint32_t LayerAndExtension::DeviceLayerCount()
+bool LayerAndExtension::EnableDeviceExtensions(const vector<const char*>& extensionNames)
 {
     assert(_physicalDev != VK_NULL_HANDLE);
-    return _deviceLayers.size();
+    if (!extensionNames.size()) {
+        return false;
+    }
+
+    _deviceExtensionNamesEnabled.clear();
+    int i = 0;
+    for (; i < extensionNames.size(); i++) {
+        if (IsDeviceExtensionSupported(extensionNames[i])) {
+            _deviceExtensionNamesEnabled.push_back(static_cast<const char*>(extensionNames[i]));
+        } else {
+            break;
+        }
+    }
+    return (i == extensionNames.size());
 }
 
-char** LayerAndExtension::DeviceLayerNames()
+bool LayerAndExtension::IsDeviceExtensionSupported(const char* extensionName)
+{
+    for (auto name : _deviceExtensionNames) {
+        if (!strcmp(name, extensionName)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/*uint32_t LayerAndExtension::DeviceLayerEnabledCount()
 {
     assert(_physicalDev != VK_NULL_HANDLE);
-    if (_deviceLayers.size()) {
-        return _deviceLayers.data();
+    return _deviceLayerNamesEnabled.size();
+}
+
+const char** LayerAndExtension::DeviceLayerNamesEnabled()
+{
+    assert(_physicalDev != VK_NULL_HANDLE);
+    if (_deviceLayerNamesEnabled.size()) {
+        return _deviceLayerNamesEnabled.data();
     }
     return nullptr;
-}
+}*/
 
-uint32_t LayerAndExtension::DeviceExtensionCount(void)
+uint32_t LayerAndExtension::DeviceExtensionEnabledCount(void) const
 {
     assert(_physicalDev != VK_NULL_HANDLE);
-    return _deviceExtensions.size();
+    DebugLog("%d enabled device extensions.", _deviceExtensionNamesEnabled.size());
+    return _deviceExtensionNamesEnabled.size();
 }
 
-char** LayerAndExtension::DeviceExtensionNames()
+const char* const* LayerAndExtension::DeviceExtensionNamesEnabled(void) const
 {
     assert(_physicalDev != VK_NULL_HANDLE);
-    if (_deviceExtensions.size()) {
-        return _deviceExtensions.data();
+    if (_deviceExtensionNamesEnabled.size()) {
+        for (auto name : _deviceExtensionNamesEnabled) {
+            DebugLog("  %s enabled", name);
+        }
+        return _deviceExtensionNamesEnabled.data();
     }
     return nullptr;
 }

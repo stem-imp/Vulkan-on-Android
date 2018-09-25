@@ -30,7 +30,7 @@ namespace AndroidNative {
         function<void(void)> onStop;
         function<void(void)> onDestroy;
 
-        function<void(void)> onConfigurationChanged;
+        function<void(android_app *)> onConfigurationChanged;
         function<void(void)> onLowMemory;
     private:
         void Activate();

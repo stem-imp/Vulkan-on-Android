@@ -129,10 +129,9 @@ void EventLoop::ProcessAppEvent(android_app* app, int32_t command)
                 onDestroy();
             }
             break;
-
         case APP_CMD_CONFIG_CHANGED:
             if (onConfigurationChanged != nullptr) {
-                onConfigurationChanged();
+                onConfigurationChanged(app);
             }
             break;
         case APP_CMD_LOW_MEMORY:
