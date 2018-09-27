@@ -31,7 +31,7 @@ void CreateImageViews(const InstanceInfo& instanceInfo, SwapchainInfo& swapchain
 void CreateRenderPass(const InstanceInfo& instanceInfo, const SwapchainInfo& swapchainInfo, VkRenderPass& renderPass);
 // createGraphicsPipeline
 void CreateFrameBuffers(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass renderPass, VkImageView depthView = VK_NULL_HANDLE);
-bool CreateCommandPool(const DeviceInfo& deviceInfo, VkQueueFlagBits family, CommandInfo& commandInfo);
+void CreateCommandPool(const DeviceInfo& deviceInfo, VkQueueFlagBits family, CommandInfo& commandInfo);
 void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, const DeviceInfo& deviceInfo, CommandInfo& commandInfo, const VkRenderPass& renderPass);
 void CreateSharedGraphicsAndPresentSyncPrimitives(const DeviceInfo& deviceInfo, DrawSyncPrimitives& primitives);
 
@@ -87,14 +87,10 @@ bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swa
     commandPools.clear();
     commandInfos.clear();
     CommandInfo graphicsCommandInfo, transferCommandInfo;
-    if (!CreateCommandPool(instanceInfo.devices[0], VK_QUEUE_GRAPHICS_BIT, graphicsCommandInfo)) {
-        return false;
-    }
+    CreateCommandPool(instanceInfo.devices[0], VK_QUEUE_GRAPHICS_BIT, graphicsCommandInfo);
     commandInfos.push_back(graphicsCommandInfo);
     commandPools.insert(commandInfos[commandInfos.size() - 1].pool);
-    if (!CreateCommandPool(instanceInfo.devices[0], VK_QUEUE_TRANSFER_BIT, transferCommandInfo)) {
-        transferCommandInfo.pool = graphicsCommandInfo.pool;
-    }
+    CreateCommandPool(instanceInfo.devices[0], VK_QUEUE_TRANSFER_BIT, transferCommandInfo);
     commandInfos.push_back(transferCommandInfo);
     commandPools.insert(commandInfos[commandInfos.size() - 1].pool);
 
@@ -615,30 +611,22 @@ void CreateFrameBuffers(const InstanceInfo& instanceInfo, SwapchainInfo& swapcha
     }
 }
 
-bool CreateCommandPool(const DeviceInfo& deviceInfo, VkQueueFlagBits family, CommandInfo& commandInfo)
+void CreateCommandPool(const DeviceInfo& deviceInfo, VkQueueFlagBits family, CommandInfo& commandInfo)
 {
     VkCommandPoolCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     switch (family) {
         case VK_QUEUE_GRAPHICS_BIT:
             createInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-            createInfo.queueFamilyIndex = deviceInfo.familyToIndex.at((int)VK_QUEUE_GRAPHICS_BIT);
+            createInfo.queueFamilyIndex = deviceInfo.familyToIndex.at((int)family);
             break;
-        case VK_QUEUE_COMPUTE_BIT:
-            break;
-        case VK_QUEUE_TRANSFER_BIT: {
-            if (deviceInfo.familyToIndex.find((int)family) == deviceInfo.familyToIndex.end()) {
-                return false;
-            }
-            uint32_t index = deviceInfo.familyToIndex.at((int)family);
-            if (deviceInfo.indexToFamily.at(index).size() == 1 || (deviceInfo.familyToIndex.at((int)VK_QUEUE_GRAPHICS_BIT) != index &&
-               deviceInfo.familyToIndex.at((int)VK_QUEUE_COMPUTE_BIT) != index))
-            {
-                createInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-                createInfo.queueFamilyIndex = index;
+        case VK_QUEUE_TRANSFER_BIT:
+            createInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+            if (deviceInfo.familyToIndex.find((int)family) != deviceInfo.familyToIndex.end()) {
+                createInfo.queueFamilyIndex = deviceInfo.familyToIndex.at((int)family);
             } else {
-                return false;
-            }}
+                createInfo.queueFamilyIndex = deviceInfo.familyToIndex.at((int)VK_QUEUE_GRAPHICS_BIT);
+            }
             break;
         default:
             break;
@@ -649,7 +637,6 @@ bool CreateCommandPool(const DeviceInfo& deviceInfo, VkQueueFlagBits family, Com
         string code = to_string(result);
         throw runtime_error("vkCreateCommandPool: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
     }
-    return true;
 }
 
 void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, const DeviceInfo& deviceInfo, CommandInfo& commandInfo, const VkRenderPass& renderPass)
