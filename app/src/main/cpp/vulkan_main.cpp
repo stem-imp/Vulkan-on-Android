@@ -755,6 +755,8 @@ VkResult DrawFrame(InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkR
             return result;
         }
 
+        vkResetFences(device, 1, &sharedPrimitive.inFlightFences[sharedPrimitive.currentFrame]);
+
         VkSubmitInfo submitInfo = {};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         VkSemaphore waitSemaphores[] = { sharedPrimitive.imageAvailableSemaphores[sharedPrimitive.currentFrame] };
@@ -768,8 +770,6 @@ VkResult DrawFrame(InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkR
         VkSemaphore signalSemaphores[] = { sharedPrimitive.renderFinishedSemaphores[sharedPrimitive.currentFrame] };
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
-
-        vkResetFences(device, 1, &sharedPrimitive.inFlightFences[sharedPrimitive.currentFrame]);
 
         VkQueue graphicsQueue = deviceInfo.queues[device][(int)VK_QUEUE_GRAPHICS_BIT][0].queue;
         result = vkQueueSubmit(graphicsQueue, 1, &submitInfo, sharedPrimitive.inFlightFences[sharedPrimitive.currentFrame]);
@@ -871,7 +871,7 @@ void DeleteSwapchain(const DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo)
         vkDestroyFramebuffer(device, swapchainInfo.framebuffers[i], nullptr);
         vkDestroyImageView(device, swapchainInfo.views[i], nullptr);
         // The application must not destroy a swapchain until after completion of all outstanding operations on images that
-        // were acquired from the swapchain. swapchain and all associated VkImage handles are destroyed, andmust not be
+        // were acquired from the swapchain. swapchain and all associated VkImage handles are destroyed, and must not be
         // acquired or used any more by the application.
         //vkDestroyImage(device, swapchainInfo.images[i], nullptr);
     }
