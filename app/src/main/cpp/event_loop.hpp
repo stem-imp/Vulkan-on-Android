@@ -16,7 +16,7 @@ namespace AndroidNative {
 
         function<status(void)> onActivate;
         function<void(void)> onDeactivate;
-        function<status(void)> onStep;
+        function<status(android_app *)> onStep;
 
         function<void(void)> onStart;
         function<void(void)> onResume;

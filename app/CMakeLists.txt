@@ -52,6 +52,12 @@ target_link_libraries( # Specifies the target library.
                        # included in the NDK.
                        ${log-lib} )
 
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/main/glm)
+add_definitions("-DGLM_FORCE_SIZE_T_LENGTH -DGLM_FORCE_RADIANS")
+
+# Import the CMakeLists.txt for the glm library
+add_subdirectory(src/main/glm)
+
 set(VULKAN_INCLUDE_DIR ${ANDROID_NDK}/sources/third_party/vulkan/src/include)
 set(VULKAN_COMMON_DIR ${ANDROID_NDK}/sources/third_party/vulkan/src/common)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_DEBUG_EXTENTIONS -DVK_USE_PLATFORM_ANDROID_KHR")

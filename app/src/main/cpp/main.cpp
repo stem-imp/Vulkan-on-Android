@@ -16,10 +16,18 @@ VkRenderPass renderPass;
 set<VkCommandPool> commandPools;
 vector<CommandInfo> commandInfos;
 vector<DrawSyncPrimitives> drawSyncPrimitives;
+vector<VertexV1> vertices = {
+    {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+    {{-0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
+    {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}},
+};
+vector<uint16_t> indices = { 0, 1, 2 };
+BufferInfo bufferInfo;
+PipelineInfo pipelineInfo;
 
 static status OnActivate();
 static void OnDeactivate();
-static status OnStep();
+static status OnStep(android_app* app);
 
 static void OnStart(void);
 static void OnResume(void);
@@ -78,11 +86,11 @@ static void OnDeactivate()
     DebugLog("App OnDeactivate");
 }
 
-status OnStep()
+status OnStep(android_app* app)
 {
     //DebugLog("App OnStep");
 
-    VkResult result = DrawFrame(instanceInfo, swapchainInfo, renderPass, commandInfos, drawSyncPrimitives);
+    VkResult result = DrawFrame(app, instanceInfo, swapchainInfo, renderPass, commandInfos, pipelineInfo, drawSyncPrimitives, bufferInfo, indices);
     if (result == VK_SUCCESS) {
         return OK;
     } else {
@@ -121,14 +129,14 @@ void OnInitWindow(android_app* app)
 
     instanceInfo.width = ANativeWindow_getWidth(app->window);
     instanceInfo.height = ANativeWindow_getHeight(app->window);
-    InitVulkan(app, instanceInfo, swapchainInfo, renderPass, commandPools, commandInfos, drawSyncPrimitives);
+    InitVulkan(app, instanceInfo, swapchainInfo, renderPass, commandPools, commandInfos, drawSyncPrimitives, vertices, indices, bufferInfo, pipelineInfo);
 }
 
 void OnTermWindow(void)
 {
     DebugLog("App OnTermWindow");
 
-    DeleteVulkan(instanceInfo, commandPools, commandInfos, renderPass, swapchainInfo, drawSyncPrimitives);
+    DeleteVulkan(instanceInfo, commandPools, commandInfos, pipelineInfo, renderPass, swapchainInfo, drawSyncPrimitives, bufferInfo);
 }
 
 void OnGainFocus(void)

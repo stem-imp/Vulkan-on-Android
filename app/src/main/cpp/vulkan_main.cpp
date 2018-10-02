@@ -29,16 +29,23 @@ void CreateLogicalDevice(DeviceInfo& deviceInfo, const LayerAndExtension& layerA
 void CreateSwapChain(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo);
 void CreateImageViews(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo);
 void CreateRenderPass(const InstanceInfo& instanceInfo, const SwapchainInfo& swapchainInfo, VkRenderPass& renderPass);
-// createGraphicsPipeline
+void CreateGraphicsPipeline(PipelineInfo& pipelineInfo, android_app* app, const DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass);
 void CreateFrameBuffers(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass renderPass, VkImageView depthView = VK_NULL_HANDLE);
 void CreateCommandPool(const DeviceInfo& deviceInfo, VkQueueFlagBits family, CommandInfo& commandInfo);
-void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, const DeviceInfo& deviceInfo, CommandInfo& commandInfo, const VkRenderPass& renderPass);
+
+void CreateVertexBuffer(vector<VertexV1>& vertices, BufferInfo& bufferInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo);
+void CreateBuffer(DeviceInfo &deviceInfo, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags preferredProperties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
+bool MapMemoryTypeToIndex(VkPhysicalDevice& physicalDevice, uint32_t memoryRequirements, VkMemoryPropertyFlags preferredProperties, uint32_t& memoryIndex);;
+void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, DeviceInfo &deviceInfo, VkCommandPool commandPool);
+void CreateIndexBuffer(vector<uint16_t>& indices, BufferInfo& bufferInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo);
+
+void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, const DeviceInfo& deviceInfo, CommandInfo& commandInfo, const VkRenderPass& renderPass, const PipelineInfo& pipelineInfo, const BufferInfo& bufferInfo, const vector<uint16_t>& indices);
 void CreateSharedGraphicsAndPresentSyncPrimitives(const DeviceInfo& deviceInfo, DrawSyncPrimitives& primitives);
 
 void DeleteSwapchain(const DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo);
-void DeleteRenderData(const InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo);
+void DeleteRenderData(const InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo);
 
-bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, vector<DrawSyncPrimitives>& primitives)
+bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, vector<DrawSyncPrimitives>& primitives, vector<VertexV1>& vertices, vector<uint16_t>& indices, BufferInfo& bufferInfo, PipelineInfo& pipelineInfo)
 {
     if (instanceInfo.initialized) {
         return true;
@@ -94,8 +101,13 @@ bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swa
     commandInfos.push_back(transferCommandInfo);
     commandPools.insert(commandInfos[commandInfos.size() - 1].pool);
 
+    CreateGraphicsPipeline(pipelineInfo, app, instanceInfo.devices[0], swapchainInfo, renderPass);
+
+    CreateVertexBuffer(vertices, bufferInfo, instanceInfo.devices[0], commandInfos[1]);
+    CreateIndexBuffer(indices, bufferInfo, instanceInfo.devices[0], commandInfos[1]);
+
     if (instanceInfo.devices[0].sharedGraphicsAndPresentQueue) {
-        CreateSharedGraphicsAndPresentCommandBuffers(swapchainInfo, instanceInfo.devices[0], commandInfos[0], renderPass);
+        CreateSharedGraphicsAndPresentCommandBuffers(swapchainInfo, instanceInfo.devices[0], commandInfos[0], renderPass, pipelineInfo, bufferInfo, indices);
         primitives.resize(2);
         for (auto &p : primitives) {
             p.concurrentFrameCount = 2;
@@ -482,14 +494,15 @@ void CreateSwapChain(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainI
     }
 }
 
-void RecreateSwapchain(const InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo)
+void RecreateSwapchain(android_app* app, const InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, const BufferInfo& bufferInfo, const vector<uint16_t>& indices)
 {
-    DeleteRenderData(instanceInfo, commandInfos, renderPass, swapchainInfo);
+    DeleteRenderData(instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo);
     CreateSwapChain(instanceInfo, swapchainInfo);
     CreateImageViews(instanceInfo, swapchainInfo);
     CreateRenderPass(instanceInfo, swapchainInfo, renderPass);
+    CreateGraphicsPipeline(pipelineInfo, app, instanceInfo.devices[0], swapchainInfo, renderPass);
     CreateFrameBuffers(instanceInfo, swapchainInfo, renderPass);
-    CreateSharedGraphicsAndPresentCommandBuffers(swapchainInfo, instanceInfo.devices[0], commandInfos[0], renderPass);
+    CreateSharedGraphicsAndPresentCommandBuffers(swapchainInfo, instanceInfo.devices[0], commandInfos[0], renderPass, pipelineInfo, bufferInfo, indices);
 }
 
 void CreateImageViews(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo)
@@ -586,6 +599,148 @@ void CreateRenderPass(const InstanceInfo& instanceInfo, const SwapchainInfo& swa
     }
 }
 
+VkShaderModule LoadShaderFromFile(const char* filePath, android_app* app, const DeviceInfo& deviceInfo)
+{
+    AAsset* file = AAssetManager_open(app->activity->assetManager, filePath, AASSET_MODE_BUFFER);
+    size_t fileLength = AAsset_getLength(file);
+    vector<char> fileContent(fileLength, 0);
+    AAsset_read(file, fileContent.data(), fileLength);
+
+    VkShaderModuleCreateInfo createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    createInfo.codeSize = fileLength;
+    createInfo.pCode = (const uint32_t*)fileContent.data();
+    VkDevice device = deviceInfo.logicalDevices[0];
+    VkShaderModule shader;
+    VkResult result = vkCreateShaderModule(device, &createInfo, nullptr, &shader);
+    if (result != VK_SUCCESS) {
+        string code = to_string(result);
+        throw runtime_error("vkCreateShaderModule: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
+    }
+    return shader;
+}
+
+void CreateGraphicsPipeline(PipelineInfo& pipelineInfo, android_app* app, const DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass)
+{
+    // Create shader stage.
+    VkShaderModule vertexShader = LoadShaderFromFile("shaders/triangle.vert.spv", app, deviceInfo);
+    VkShaderModule fragmentShader = LoadShaderFromFile("shaders/triangle.frag.spv", app, deviceInfo);
+    VkPipelineShaderStageCreateInfo shaderStages[] = {
+        {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = VK_SHADER_STAGE_VERTEX_BIT,
+            .module = vertexShader,
+            .pName = "main",
+        },
+        {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .module = fragmentShader,
+            .pName = "main",
+        }
+    };
+
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
+    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    auto bindingDescription = VertexV1::GetBindingDescription(0);
+    auto attributeDescriptions = VertexV1::GetAttributeDescriptions(0);
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
+    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+    // pTessellationState  ignored.
+
+    VkViewport viewport = {};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = (float) swapchainInfo.extent.width;
+    viewport.height = (float) swapchainInfo.extent.height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    VkRect2D scissor = {};
+    scissor.offset = {0, 0};
+    scissor.extent = swapchainInfo.extent;
+
+    VkPipelineViewportStateCreateInfo viewportState = {};
+    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.viewportCount = 1;
+    viewportState.pViewports = &viewport;
+    viewportState.scissorCount = 1;
+    viewportState.pScissors = &scissor;
+
+    VkPipelineRasterizationStateCreateInfo rasterizer = {};
+    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizer.depthClampEnable = VK_FALSE;
+    rasterizer.rasterizerDiscardEnable = VK_FALSE;
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.depthBiasEnable = VK_FALSE;
+    rasterizer.lineWidth = 1.0f;
+
+    VkPipelineMultisampleStateCreateInfo multisampling = {};
+    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampling.sampleShadingEnable = VK_FALSE;
+
+    // pDepthStencilState ignored.
+
+    VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.blendEnable = VK_FALSE;
+
+    VkPipelineColorBlendStateCreateInfo colorBlending = {};
+    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlending.logicOpEnable = VK_FALSE;
+    colorBlending.logicOp = VK_LOGIC_OP_COPY;
+    colorBlending.attachmentCount = 1;
+    colorBlending.pAttachments = &colorBlendAttachment;
+
+    // pDynamicState ignored.
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = 0;
+    pipelineLayoutInfo.pushConstantRangeCount = 0;
+    VkDevice device = deviceInfo.logicalDevices[0];
+    VkResult result = vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineInfo.layout);
+    if (result != VK_SUCCESS) {
+        string code = to_string(result);
+        throw runtime_error("vkCreatePipelineLayout: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
+    }
+
+    VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
+    pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineCreateInfo.stageCount = 2;
+    pipelineCreateInfo.pStages = shaderStages;
+    pipelineCreateInfo.pVertexInputState = &vertexInputInfo;
+    pipelineCreateInfo.pInputAssemblyState = &inputAssembly;
+    pipelineCreateInfo.pViewportState = &viewportState;
+    pipelineCreateInfo.pRasterizationState = &rasterizer;
+    pipelineCreateInfo.pMultisampleState = &multisampling;
+    pipelineCreateInfo.pColorBlendState = &colorBlending;
+    pipelineCreateInfo.layout = pipelineInfo.layout;
+    pipelineCreateInfo.renderPass = renderPass;
+    pipelineCreateInfo.subpass = 0;
+    pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
+
+    result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipelineInfo.pipeline);
+    if (result != VK_SUCCESS) {
+        string code = to_string(result);
+        throw runtime_error("vkCreateGraphicsPipelines: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
+    }
+
+    vkDestroyShaderModule(device, vertexShader, nullptr);
+    vkDestroyShaderModule(device, fragmentShader, nullptr);
+}
+
 void CreateFrameBuffers(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass renderPass, VkImageView depthView)
 {
     size_t size = swapchainInfo.images.size();
@@ -639,7 +794,153 @@ void CreateCommandPool(const DeviceInfo& deviceInfo, VkQueueFlagBits family, Com
     }
 }
 
-void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, const DeviceInfo& deviceInfo, CommandInfo& commandInfo, const VkRenderPass& renderPass)
+void CreateVertexBuffer(vector<VertexV1>& vertices, BufferInfo& bufferInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo)
+{
+    VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    CreateBuffer(deviceInfo, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 stagingBuffer, stagingBufferMemory);
+
+    VkDevice device = deviceInfo.logicalDevices[0];
+    void* data;
+    vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+    memcpy(data, vertices.data(), (size_t) bufferSize);
+    vkUnmapMemory(device, stagingBufferMemory);
+
+    CreateBuffer(deviceInfo, bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferInfo.vertexBuffer, bufferInfo.vertexBufferMemory);
+
+    CopyBuffer(stagingBuffer, bufferInfo.vertexBuffer, bufferSize, deviceInfo, commandInfo.pool);
+
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingBufferMemory, nullptr);
+}
+
+void CreateIndexBuffer(vector<uint16_t>& indices, BufferInfo& bufferInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo)
+{
+    VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    CreateBuffer(deviceInfo, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 stagingBuffer, stagingBufferMemory);
+
+    VkDevice device = deviceInfo.logicalDevices[0];
+    void* data;
+    vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+    memcpy(data, indices.data(), (size_t) bufferSize);
+    vkUnmapMemory(device, stagingBufferMemory);
+
+    CreateBuffer(deviceInfo, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferInfo.indexBuffer, bufferInfo.indexBufferMemory);
+
+    CopyBuffer(stagingBuffer, bufferInfo.indexBuffer, bufferSize, deviceInfo, commandInfo.pool);
+
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingBufferMemory, nullptr);
+}
+
+void CreateBuffer(DeviceInfo &deviceInfo, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags preferredProperties, VkBuffer &buffer, VkDeviceMemory &bufferMemory)
+{
+    VkBufferCreateInfo bufferInfo = {};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = size;
+    bufferInfo.usage = usage;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VkDevice device = deviceInfo.logicalDevices[0];
+    VkResult result = vkCreateBuffer(device, &bufferInfo, nullptr, &buffer);
+    if (result != VK_SUCCESS) {
+        string code = to_string(result);
+        throw runtime_error("vkCreateBuffer: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    MapMemoryTypeToIndex(deviceInfo.physicalDevice, memRequirements.memoryTypeBits, preferredProperties, allocInfo.memoryTypeIndex);
+
+    result = vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory);
+    if (result != VK_SUCCESS) {
+        string code = to_string(result);
+        throw runtime_error("vkAllocateMemory: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
+    }
+
+    vkBindBufferMemory(device, buffer, bufferMemory, 0);
+}
+
+bool MapMemoryTypeToIndex(VkPhysicalDevice& physicalDevice, uint32_t memoryRequirements, VkMemoryPropertyFlags preferredProperties, uint32_t& memoryIndex)
+{
+    VkPhysicalDeviceMemoryProperties devMemProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &devMemProperties);
+
+    for (uint32_t i = 0; i < devMemProperties.memoryTypeCount; i++) {
+        if ((memoryRequirements & (1 << i)) && (devMemProperties.memoryTypes[i].propertyFlags & preferredProperties) == preferredProperties) {
+            memoryIndex = i;
+            return true;
+        }
+    }
+    return false;
+}
+
+void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, DeviceInfo &deviceInfo, VkCommandPool commandPool)
+{
+    VkCommandBufferAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = commandPool;
+    allocInfo.commandBufferCount = 1;
+
+    VkDevice device = deviceInfo.logicalDevices[0];
+    VkCommandBuffer commandBuffer;
+    vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+
+    VkCommandBufferBeginInfo beginInfo = {};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+    VkBufferCopy copyRegion = {};
+    copyRegion.size = size;
+    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+    vkEndCommandBuffer(commandBuffer);
+
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    VkQueue queue;
+    if (deviceInfo.queues[device].find((int)VK_QUEUE_TRANSFER_BIT) != deviceInfo.queues[device].end()) {
+        queue = deviceInfo.queues[device][(int)VK_QUEUE_TRANSFER_BIT][0].queue;
+    } else {
+        queue = deviceInfo.queues[device][(int)VK_QUEUE_GRAPHICS_BIT][0].queue;
+    }
+    VkFence fence;
+    VkFenceCreateInfo createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    VkResult result = vkCreateFence(device, &createInfo, nullptr, &fence);
+    if (result != VK_SUCCESS) {
+        string code = to_string(result);
+        throw runtime_error("vkCreateFence: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
+    }
+    vkQueueSubmit(queue, 1, &submitInfo, fence);
+    vkWaitForFences(device, 1, &fence, VK_TRUE, numeric_limits<uint64_t>::max());
+
+    vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+}
+
+void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, const DeviceInfo& deviceInfo, CommandInfo& commandInfo, const VkRenderPass& renderPass, const PipelineInfo& pipelineInfo, const BufferInfo& bufferInfo, const vector<uint16_t>& indices)
 {
     uint32_t size = swapchainInfo.images.size();
     commandInfo.buffer.resize(size);
@@ -685,7 +986,16 @@ void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, 
         renderPassBeginInfo.pClearValues = &clearColor;
 
         vkCmdBeginRenderPass(commandInfo.buffer[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-        // draw something
+
+        vkCmdBindPipeline(commandInfo.buffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineInfo.pipeline);
+
+        VkBuffer vertexBuffers[] = { bufferInfo.vertexBuffer };
+        VkDeviceSize offsets[] = {0};
+        vkCmdBindVertexBuffers(commandInfo.buffer[i], 0, 1, vertexBuffers, offsets);
+        vkCmdBindIndexBuffer(commandInfo.buffer[i], bufferInfo.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+
+        vkCmdDrawIndexed(commandInfo.buffer[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+
         vkCmdEndRenderPass(commandInfo.buffer[i]);
 
         result = vkEndCommandBuffer(commandInfo.buffer[i]);
@@ -726,7 +1036,7 @@ void CreateSharedGraphicsAndPresentSyncPrimitives(const DeviceInfo& deviceInfo, 
     }
 }
 
-VkResult DrawFrame(InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, vector<CommandInfo>& commandInfos, vector<DrawSyncPrimitives>& primitives)
+VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, vector<DrawSyncPrimitives>& primitives, const BufferInfo& bufferInfo, const vector<uint16_t>& indices)
 {
     DeviceInfo& deviceInfo = instanceInfo.devices[0];
     VkDevice device = deviceInfo.logicalDevices[0];
@@ -737,7 +1047,7 @@ VkResult DrawFrame(InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkR
         uint32_t imageIndex;
         VkResult result = vkAcquireNextImageKHR(device, swapchainInfo.swapchain, numeric_limits<uint64_t>::max(), sharedPrimitive.imageAvailableSemaphores[sharedPrimitive.currentFrame], VK_NULL_HANDLE, &imageIndex);
         if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-            RecreateSwapchain(instanceInfo, commandInfos, renderPass, swapchainInfo);
+            RecreateSwapchain(app, instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo, bufferInfo, indices);
         } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
             return result;
         }
@@ -779,7 +1089,7 @@ VkResult DrawFrame(InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkR
             string code = to_string(result);
             DebugLog("vkQueuePresentKHR: code[%d], file[%s], line[%d]", result, __FILE__, __LINE__);
             instanceInfo.resolutionChanged = false;
-            RecreateSwapchain(instanceInfo, commandInfos, renderPass, swapchainInfo);
+            RecreateSwapchain(app, instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo, bufferInfo, indices);
         } else if (result != VK_SUCCESS) {
             string code = to_string(result);
             throw runtime_error("vkQueuePresentKHR: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
@@ -792,14 +1102,20 @@ VkResult DrawFrame(InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkR
     return VK_SUCCESS;
 }
 
-void DeleteVulkan(InstanceInfo& instanceInfo, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, vector<DrawSyncPrimitives>& primitives)
+void DeleteVulkan(InstanceInfo& instanceInfo, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, vector<DrawSyncPrimitives>& primitives, BufferInfo& bufferInfo)
 {
     DeviceInfo deviceInfo = instanceInfo.devices[0];
     VkDevice device = deviceInfo.logicalDevices[0];
 
     //////////////////////////////
-    DeleteRenderData(instanceInfo, commandInfos, renderPass, swapchainInfo);
+    DeleteRenderData(instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo);
     ////////////////////////////////
+
+    vkDestroyBuffer(device, bufferInfo.indexBuffer, nullptr);
+    vkFreeMemory(device, bufferInfo.indexBufferMemory, nullptr);
+
+    vkDestroyBuffer(device, bufferInfo.vertexBuffer, nullptr);
+    vkFreeMemory(device, bufferInfo.vertexBufferMemory, nullptr);
 
     for (size_t i = 0; i < primitives.size(); i++) {
         for (size_t j = 0; j < primitives[i].concurrentFrameCount; j++) {
@@ -832,7 +1148,7 @@ void DeleteVulkan(InstanceInfo& instanceInfo, set<VkCommandPool>& commandPools, 
     instanceInfo.initialized = false;
 }
 
-void DeleteRenderData(const InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo)
+void DeleteRenderData(const InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo)
 {
     DeviceInfo deviceInfo = instanceInfo.devices[0];
     VkDevice device = deviceInfo.logicalDevices[0];
@@ -846,6 +1162,8 @@ void DeleteRenderData(const InstanceInfo& instanceInfo, vector<CommandInfo>& com
         vkFreeCommandBuffers(device, cmd.pool, (uint32_t)cmd.buffer.size(), cmd.buffer.data());
     }
 
+    vkDestroyPipeline(device, pipelineInfo.pipeline, nullptr);
+    vkDestroyPipelineLayout(device, pipelineInfo.layout, nullptr);
     vkDestroyRenderPass(device, renderPass, nullptr);
     DeleteSwapchain(deviceInfo, swapchainInfo);
 }

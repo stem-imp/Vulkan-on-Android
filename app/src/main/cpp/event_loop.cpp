@@ -31,7 +31,7 @@ void EventLoop::Run()
             }
         }
         if (_enabled && !_quit) {
-            if (onStep != nullptr && onStep() != OK) {
+            if (onStep != nullptr && onStep(_application) != OK) {
                 _quit = true;
                 ANativeActivity_finish(_application->activity);
             }

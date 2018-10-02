@@ -1,13 +1,17 @@
 #ifndef VULKAN_MAIN_HPP
 #define VULKAN_MAIN_HPP
 
-#include <android_native_app_glue.h>
 #include "layer_extension.hpp"
+#include "glm.hpp"
+#include <android_native_app_glue.h>
 #include <map>
 #include <set>
+#include <array>
 
+using glm::vec3;
 using std::map;
 using std::set;
+using std::array;
 
 extern const int VK_QUEUE_PRESENT_BIT;
 
@@ -76,11 +80,43 @@ typedef struct DrawSyncPrimitives {
     size_t currentFrame = 0;
 } DrawSyncPrimitives;
 
+typedef struct VertexV1 {
+    vec3 pos;
+    vec3 color;
+
+    static VkVertexInputBindingDescription GetBindingDescription(uint32_t binding)
+    {
+        VkVertexInputBindingDescription bindingDescription = {};
+        bindingDescription.binding = binding;
+        bindingDescription.stride = sizeof(VertexV1);
+        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+        return bindingDescription;
+    }
+
+    static array<VkVertexInputAttributeDescription, 2> GetAttributeDescriptions(uint32_t binding)
+    {
+        array<VkVertexInputAttributeDescription, 2> attributeDescriptions = {};
+
+        attributeDescriptions[0].binding = binding;
+        attributeDescriptions[0].location = 0;
+        attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[0].offset = offsetof(VertexV1, pos);
+
+        attributeDescriptions[1].binding = binding;
+        attributeDescriptions[1].location = 1;
+        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[1].offset = offsetof(VertexV1, color);
+
+        return attributeDescriptions;
+    }
+} VertexV1;
+
 // Initialize vulkan device context
 // after return, vulkan is ready to draw
-bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, vector<DrawSyncPrimitives>& primitives);
+bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, vector<DrawSyncPrimitives>& primitives, vector<VertexV1>& vertices, vector<uint16_t>& indices, BufferInfo& bufferInfo, PipelineInfo& pipelineInfo);
 
-VkResult DrawFrame(InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, vector<CommandInfo>& commandInfos, vector<DrawSyncPrimitives>& primitives);
-void DeleteVulkan(InstanceInfo& instanceInfo, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, vector<DrawSyncPrimitives>& primitives);
+VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, vector<DrawSyncPrimitives>& primitives, const BufferInfo& bufferInfo, const vector<uint16_t>& indices);
+void DeleteVulkan(InstanceInfo& instanceInfo, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, vector<DrawSyncPrimitives>& primitives, BufferInfo& bufferInfo);
 
 #endif // VULKAN_MAIN_HPP
