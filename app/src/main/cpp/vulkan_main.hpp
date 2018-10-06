@@ -100,7 +100,7 @@ typedef struct VertexV1 {
 
         attributeDescriptions[0].binding = binding;
         attributeDescriptions[0].location = 0;
-        attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
         attributeDescriptions[0].offset = offsetof(VertexV1, pos);
 
         attributeDescriptions[1].binding = binding;
