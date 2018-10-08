@@ -16,14 +16,21 @@ VkRenderPass renderPass;
 set<VkCommandPool> commandPools;
 vector<CommandInfo> commandInfos;
 vector<DrawSyncPrimitives> drawSyncPrimitives;
+
 vector<VertexV1> vertices = {
-    {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-    {{-0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-    {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}},
+    {{0.0f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+    {{-0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
+    {{0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}},
 };
 vector<uint16_t> indices = { 0, 1, 2 };
 BufferInfo bufferInfo;
 PipelineInfo pipelineInfo;
+
+VkDescriptorSetLayout descriptorSetLayout;
+vector<VkBuffer> uniformBuffers;
+vector<VkDeviceMemory> uniformBuffersMemory;
+VkDescriptorPool descriptorPool;
+vector<VkDescriptorSet> descriptorSets;
 
 static status OnActivate();
 static void OnDeactivate();
@@ -90,7 +97,7 @@ status OnStep(android_app* app)
 {
     //DebugLog("App OnStep");
 
-    VkResult result = DrawFrame(app, instanceInfo, swapchainInfo, renderPass, commandInfos, pipelineInfo, drawSyncPrimitives, bufferInfo, indices);
+    VkResult result = DrawFrame(app, instanceInfo, swapchainInfo, renderPass, commandInfos, pipelineInfo, drawSyncPrimitives, bufferInfo, indices, uniformBuffersMemory, descriptorSetLayout, descriptorSets);
     if (result == VK_SUCCESS) {
         return OK;
     } else {
@@ -129,14 +136,14 @@ void OnInitWindow(android_app* app)
 
     instanceInfo.width = ANativeWindow_getWidth(app->window);
     instanceInfo.height = ANativeWindow_getHeight(app->window);
-    InitVulkan(app, instanceInfo, swapchainInfo, renderPass, commandPools, commandInfos, drawSyncPrimitives, vertices, indices, bufferInfo, pipelineInfo);
+    InitVulkan(app, instanceInfo, swapchainInfo, renderPass, commandPools, commandInfos, drawSyncPrimitives, vertices, indices, bufferInfo, pipelineInfo, descriptorSetLayout, uniformBuffers, uniformBuffersMemory, descriptorPool, descriptorSets);
 }
 
 void OnTermWindow(void)
 {
     DebugLog("App OnTermWindow");
 
-    DeleteVulkan(instanceInfo, commandPools, commandInfos, pipelineInfo, renderPass, swapchainInfo, drawSyncPrimitives, bufferInfo);
+    DeleteVulkan(instanceInfo, commandPools, commandInfos, pipelineInfo, renderPass, swapchainInfo, drawSyncPrimitives, bufferInfo, descriptorSetLayout, uniformBuffers, uniformBuffersMemory, descriptorPool);
 }
 
 void OnGainFocus(void)
