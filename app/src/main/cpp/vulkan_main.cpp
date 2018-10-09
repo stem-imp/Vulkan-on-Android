@@ -50,7 +50,7 @@ void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, Devic
 void CreateIndexBuffer(vector<uint16_t>& indices, BufferInfo& bufferInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo);
 void CreateUniformBuffers(vector<VkBuffer>& uniformBuffers, vector<VkDeviceMemory>& uniformBuffersMemory, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo);
 void CreateDescriptorPool(VkDescriptorPool& descriptorPool, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo);
-void CreateDescriptorSets(vector<VkDescriptorSet>& descriptorSets, VkDescriptorPool descriptorPool, VkDescriptorSetLayout descriptorSetLayout, vector<VkBuffer>& uniformBuffers, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo);
+void CreateDescriptorSets(ResourceDescriptor& descriptor, vector<VkBuffer>& uniformBuffers, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo);
 
 void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, const DeviceInfo& deviceInfo, CommandInfo& commandInfo, const VkRenderPass& renderPass, const PipelineInfo& pipelineInfo, const BufferInfo& bufferInfo, const vector<uint16_t>& indices, vector<VkDescriptorSet>& descriptorSets);
 void CreateSharedGraphicsAndPresentSyncPrimitives(const DeviceInfo& deviceInfo, DrawSyncPrimitives& primitives);
@@ -60,7 +60,7 @@ void UpdateMVP(vector<VkDeviceMemory>& mvpMemory, uint32_t currentImageIndex, De
 void DeleteSwapchain(const DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo);
 void DeleteRenderData(const InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo);
 
-bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, vector<DrawSyncPrimitives>& primitives, vector<VertexV1>& vertices, vector<uint16_t>& indices, BufferInfo& bufferInfo, PipelineInfo& pipelineInfo, VkDescriptorSetLayout& descriptorSetLayout, vector<VkBuffer>& uniformBuffers, vector<VkDeviceMemory>& uniformBuffersMemory, VkDescriptorPool& descriptorPool, vector<VkDescriptorSet>& descriptorSets)
+bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, vector<DrawSyncPrimitives>& primitives, vector<VertexV1>& vertices, vector<uint16_t>& indices, BufferInfo& bufferInfo, PipelineInfo& pipelineInfo, vector<VkBuffer>& uniformBuffers, vector<VkDeviceMemory>& uniformBuffersMemory, ResourceDescriptor& resourceDescriptor, set<VkDescriptorPool>& descriptorPools)
 {
     if (instanceInfo.initialized) {
         return true;
@@ -116,17 +116,22 @@ bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swa
     commandInfos.push_back(transferCommandInfo);
     commandPools.insert(commandInfos[commandInfos.size() - 1].pool);
 
+    resourceDescriptor.layouts.clear();
+    resourceDescriptor.layouts.push_back(VkDescriptorSetLayout{});
+    VkDescriptorSetLayout& descriptorSetLayout = resourceDescriptor.layouts[0];
     CreateDescriptorSetLayout(descriptorSetLayout, instanceInfo.devices[0]);
     CreateGraphicsPipeline(pipelineInfo, app, instanceInfo.devices[0], swapchainInfo, renderPass, descriptorSetLayout);
 
     CreateVertexBuffer(vertices, bufferInfo, instanceInfo.devices[0], commandInfos[1]);
     CreateIndexBuffer(indices, bufferInfo, instanceInfo.devices[0], commandInfos[1]);
     CreateUniformBuffers(uniformBuffers, uniformBuffersMemory, instanceInfo.devices[0], swapchainInfo);
-    CreateDescriptorPool(descriptorPool, instanceInfo.devices[0], swapchainInfo);
-    CreateDescriptorSets(descriptorSets, descriptorPool, descriptorSetLayout, uniformBuffers, instanceInfo.devices[0], swapchainInfo);
+    CreateDescriptorPool(resourceDescriptor.pool, instanceInfo.devices[0], swapchainInfo);
+    descriptorPools.clear();
+    descriptorPools.insert(resourceDescriptor.pool);
+    CreateDescriptorSets(resourceDescriptor, uniformBuffers, instanceInfo.devices[0], swapchainInfo);
 
     if (instanceInfo.devices[0].sharedGraphicsAndPresentQueue) {
-        CreateSharedGraphicsAndPresentCommandBuffers(swapchainInfo, instanceInfo.devices[0], commandInfos[0], renderPass, pipelineInfo, bufferInfo, indices, descriptorSets);
+        CreateSharedGraphicsAndPresentCommandBuffers(swapchainInfo, instanceInfo.devices[0], commandInfos[0], renderPass, pipelineInfo, bufferInfo, indices, resourceDescriptor.sets);
         primitives.resize(2);
         for (auto &p : primitives) {
             p.concurrentFrameCount = 2;
@@ -445,7 +450,7 @@ VkPresentModeKHR ChooseSwapchainPresentMode(const vector<VkPresentModeKHR> avail
 
 VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, const InstanceInfo& instanceInfo)
 {
-    if (capabilities.currentExtent.width != numeric_limits<uint32_t>::max()) {
+    if (capabilities.currentExtent.width != numeric_limits<uint32_t>::max() && !instanceInfo.resolutionChanged) {
         return capabilities.currentExtent;
     } else {
         VkExtent2D actualExtent = { static_cast<uint32_t>(instanceInfo.width), static_cast<uint32_t>(instanceInfo.height) };
@@ -513,15 +518,15 @@ void CreateSwapChain(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainI
     }
 }
 
-void RecreateSwapchain(android_app* app, const InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, const BufferInfo& bufferInfo, const vector<uint16_t>& indices, VkDescriptorSetLayout& descriptorSetLayout, vector<VkDescriptorSet>& descriptorSets)
+void RecreateSwapchain(android_app* app, const InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, const BufferInfo& bufferInfo, const vector<uint16_t>& indices, ResourceDescriptor& resourceDescriptor)
 {
     DeleteRenderData(instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo);
     CreateSwapChain(instanceInfo, swapchainInfo);
     CreateImageViews(instanceInfo, swapchainInfo);
     CreateRenderPass(instanceInfo, swapchainInfo, renderPass);
-    CreateGraphicsPipeline(pipelineInfo, app, instanceInfo.devices[0], swapchainInfo, renderPass, descriptorSetLayout);
+    CreateGraphicsPipeline(pipelineInfo, app, instanceInfo.devices[0], swapchainInfo, renderPass, resourceDescriptor.layouts[0]);
     CreateFrameBuffers(instanceInfo, swapchainInfo, renderPass);
-    CreateSharedGraphicsAndPresentCommandBuffers(swapchainInfo, instanceInfo.devices[0], commandInfos[0], renderPass, pipelineInfo, bufferInfo, indices, descriptorSets);
+    CreateSharedGraphicsAndPresentCommandBuffers(swapchainInfo, instanceInfo.devices[0], commandInfos[0], renderPass, pipelineInfo, bufferInfo, indices, resourceDescriptor.sets);
 }
 
 void CreateImageViews(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo)
@@ -1058,7 +1063,7 @@ void CreateSharedGraphicsAndPresentSyncPrimitives(const DeviceInfo& deviceInfo, 
     }
 }
 
-VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, vector<DrawSyncPrimitives>& primitives, const BufferInfo& bufferInfo, const vector<uint16_t>& indices, vector<VkDeviceMemory>& mvpMemory, VkDescriptorSetLayout& descriptorSetLayout, vector<VkDescriptorSet>& descriptorSets)
+VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, vector<DrawSyncPrimitives>& primitives, const BufferInfo& bufferInfo, const vector<uint16_t>& indices, vector<VkDeviceMemory>& mvpMemory, ResourceDescriptor& resourceDescriptor)
 {
     DeviceInfo& deviceInfo = instanceInfo.devices[0];
     VkDevice device = deviceInfo.logicalDevices[0];
@@ -1069,7 +1074,7 @@ VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& 
         uint32_t imageIndex;
         VkResult result = vkAcquireNextImageKHR(device, swapchainInfo.swapchain, numeric_limits<uint64_t>::max(), sharedPrimitive.imageAvailableSemaphores[sharedPrimitive.currentFrame], VK_NULL_HANDLE, &imageIndex);
         if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-            RecreateSwapchain(app, instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo, bufferInfo, indices, descriptorSetLayout, descriptorSets);
+            RecreateSwapchain(app, instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo, bufferInfo, indices, resourceDescriptor);
         } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
             return result;
         }
@@ -1112,8 +1117,8 @@ VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& 
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || instanceInfo.resolutionChanged) {
             string code = to_string(result);
             DebugLog("vkQueuePresentKHR: code[%d], file[%s], line[%d]", result, __FILE__, __LINE__);
+            RecreateSwapchain(app, instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo, bufferInfo, indices, resourceDescriptor);
             instanceInfo.resolutionChanged = false;
-            RecreateSwapchain(app, instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo, bufferInfo, indices, descriptorSetLayout, descriptorSets);
         } else if (result != VK_SUCCESS) {
             string code = to_string(result);
             throw runtime_error("vkQueuePresentKHR: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
@@ -1126,7 +1131,7 @@ VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& 
     return VK_SUCCESS;
 }
 
-void DeleteVulkan(InstanceInfo& instanceInfo, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, vector<DrawSyncPrimitives>& primitives, BufferInfo& bufferInfo, VkDescriptorSetLayout& descriptorSetLayout, vector<VkBuffer>& uniformBuffers, vector<VkDeviceMemory>& uniformBuffersMemory, VkDescriptorPool& descriptorPool)
+void DeleteVulkan(InstanceInfo& instanceInfo, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, vector<DrawSyncPrimitives>& primitives, BufferInfo& bufferInfo, vector<VkBuffer>& uniformBuffers, vector<VkDeviceMemory>& uniformBuffersMemory, ResourceDescriptor& resourceDescriptor, set<VkDescriptorPool>& descriptorPools)
 {
     DeviceInfo deviceInfo = instanceInfo.devices[0];
     VkDevice device = deviceInfo.logicalDevices[0];
@@ -1135,8 +1140,12 @@ void DeleteVulkan(InstanceInfo& instanceInfo, set<VkCommandPool>& commandPools, 
     DeleteRenderData(instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo);
     ////////////////////////////////
 
-    vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
-    vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+    for (auto& l : resourceDescriptor.layouts) {
+        vkDestroyDescriptorSetLayout(device, l, nullptr);
+    }
+    for (auto& p : descriptorPools) {
+        vkDestroyDescriptorPool(device, p, nullptr);
+    }
     for (size_t i = 0; i < swapchainInfo.images.size(); i++) {
         vkDestroyBuffer(device, uniformBuffers[i], nullptr);
         vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
@@ -1288,32 +1297,34 @@ void CreateDescriptorPool(VkDescriptorPool& descriptorPool, DeviceInfo& deviceIn
     }
 }
 
-void CreateDescriptorSets(vector<VkDescriptorSet>& descriptorSets, VkDescriptorPool descriptorPool, VkDescriptorSetLayout descriptorSetLayout, vector<VkBuffer>& uniformBuffers, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo)
+void CreateDescriptorSets(ResourceDescriptor& descriptor, vector<VkBuffer>& uniformBuffers, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo)
 {
-    std::vector<VkDescriptorSetLayout> layouts(swapchainInfo.images.size(), descriptorSetLayout);
+    descriptor.layouts.resize(swapchainInfo.images.size(), descriptor.layouts[0]);
     VkDescriptorSetAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = descriptorPool;
+    allocInfo.descriptorPool = descriptor.pool;
     allocInfo.descriptorSetCount = static_cast<uint32_t>(swapchainInfo.images.size());
-    allocInfo.pSetLayouts = layouts.data();
+    allocInfo.pSetLayouts = descriptor.layouts.data();
 
-    descriptorSets.resize(swapchainInfo.images.size());
+    descriptor.sets.resize(swapchainInfo.images.size());
     VkDevice device = deviceInfo.logicalDevices[0];
-    VkResult result = vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data());
+    VkResult result = vkAllocateDescriptorSets(device, &allocInfo, descriptor.sets.data());
     if (result != VK_SUCCESS) {
         string code = to_string(result);
         throw runtime_error("vkAllocateDescriptorSets: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
     }
+    // Avoid destroying the same descriptor layout.
+    descriptor.layouts.resize(1);
 
     for (size_t i = 0; i < swapchainInfo.images.size(); i++) {
         VkDescriptorBufferInfo bufferInfo = {};
         bufferInfo.buffer = uniformBuffers[i];
         bufferInfo.offset = 0;
-        bufferInfo.range = sizeof(MVP);
+        bufferInfo.range = VK_WHOLE_SIZE;
 
         VkWriteDescriptorSet descriptorWrite = {};
         descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrite.dstSet = descriptorSets[i];
+        descriptorWrite.dstSet = descriptor.sets[i];
         descriptorWrite.dstBinding = 0;
         descriptorWrite.dstArrayElement = 0;
         descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
