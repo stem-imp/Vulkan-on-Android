@@ -8,6 +8,7 @@
 #include <set>
 #include <array>
 
+using glm::vec2;
 using glm::vec3;
 using std::map;
 using std::set;
@@ -84,6 +85,7 @@ typedef struct DrawSyncPrimitives {
 typedef struct VertexV1 {
     vec3 pos;
     vec3 color;
+    vec2 texCcord;
 
     static VkVertexInputBindingDescription GetBindingDescription(uint32_t binding)
     {
@@ -95,9 +97,9 @@ typedef struct VertexV1 {
         return bindingDescription;
     }
 
-    static array<VkVertexInputAttributeDescription, 2> GetAttributeDescriptions(uint32_t binding)
+    static array<VkVertexInputAttributeDescription, 3> GetAttributeDescriptions(uint32_t binding)
     {
-        array<VkVertexInputAttributeDescription, 2> attributeDescriptions = {};
+        array<VkVertexInputAttributeDescription, 3> attributeDescriptions = {};
 
         attributeDescriptions[0].binding = binding;
         attributeDescriptions[0].location = 0;
@@ -108,6 +110,11 @@ typedef struct VertexV1 {
         attributeDescriptions[1].location = 1;
         attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
         attributeDescriptions[1].offset = offsetof(VertexV1, color);
+
+        attributeDescriptions[2].binding = binding;
+        attributeDescriptions[2].location = 2;
+        attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[2].offset = offsetof(VertexV1, texCcord);
 
         return attributeDescriptions;
     }
@@ -125,11 +132,21 @@ typedef struct ResourceDescriptor {
     vector<VkDescriptorSetLayout> layouts;
 } ResourceDescriptor;
 
+typedef struct TextureObject {
+    VkSampler sampler;
+    VkImage image;
+    VkImageLayout imageLayout;
+    VkDeviceMemory mem;
+    VkImageView view;
+    int32_t tex_width;
+    int32_t tex_height;
+} TextureOject;
+
 // Initialize vulkan device context
 // after return, vulkan is ready to draw
-bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, vector<DrawSyncPrimitives>& primitives, vector<VertexV1>& vertices, vector<uint16_t>& indices, BufferInfo& bufferInfo, PipelineInfo& pipelineInfo, vector<VkBuffer>& uniformBuffers, vector<VkDeviceMemory>& uniformBuffersMemory, ResourceDescriptor& transformDescriptor, set<VkDescriptorPool>& descriptorPools);
+bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, vector<DrawSyncPrimitives>& primitives, vector<VertexV1>& vertices, vector<uint16_t>& indices, BufferInfo& bufferInfo, PipelineInfo& pipelineInfo, vector<VkBuffer>& uniformBuffers, vector<VkDeviceMemory>& uniformBuffersMemory, ResourceDescriptor& transformDescriptor, set<VkDescriptorPool>& descriptorPools, TextureOject& textureObject);
 
 VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, vector<DrawSyncPrimitives>& primitives, const BufferInfo& bufferInfo, const vector<uint16_t>& indices, vector<VkDeviceMemory>& mvpMemory, ResourceDescriptor& resourceDescriptor);
-void DeleteVulkan(InstanceInfo& instanceInfo, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, vector<DrawSyncPrimitives>& primitives, BufferInfo& bufferInfo, vector<VkBuffer>& uniformBuffers, vector<VkDeviceMemory>& uniformBuffersMemory, ResourceDescriptor& resourceDescriptor, set<VkDescriptorPool>& descriptorPools);
+void DeleteVulkan(InstanceInfo& instanceInfo, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, vector<DrawSyncPrimitives>& primitives, BufferInfo& bufferInfo, vector<VkBuffer>& uniformBuffers, vector<VkDeviceMemory>& uniformBuffersMemory, ResourceDescriptor& resourceDescriptor, set<VkDescriptorPool>& descriptorPools, TextureOject& textureObject);
 
 #endif // VULKAN_MAIN_HPP

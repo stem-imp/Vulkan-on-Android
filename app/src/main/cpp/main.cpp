@@ -18,11 +18,12 @@ vector<CommandInfo> commandInfos;
 vector<DrawSyncPrimitives> drawSyncPrimitives;
 
 vector<VertexV1> vertices = {
-    {{0.0f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-    {{-0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-    {{0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}},
+    {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+    {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
+    {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
+    {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
 };
-vector<uint16_t> indices = { 0, 1, 2 };
+vector<uint16_t> indices = { 0, 1, 2, 0, 2, 3 };
 BufferInfo bufferInfo;
 PipelineInfo pipelineInfo;
 
@@ -33,6 +34,7 @@ vector<VkDeviceMemory> uniformBuffersMemory;
 vector<VkDescriptorSet> descriptorSets;
 set<VkDescriptorPool> descriptorPools;
 ResourceDescriptor transformDescriptor;
+TextureOject textureObject;
 
 static status OnActivate();
 static void OnDeactivate();
@@ -138,14 +140,14 @@ void OnInitWindow(android_app* app)
 
     instanceInfo.width = ANativeWindow_getWidth(app->window);
     instanceInfo.height = ANativeWindow_getHeight(app->window);
-    InitVulkan(app, instanceInfo, swapchainInfo, renderPass, commandPools, commandInfos, drawSyncPrimitives, vertices, indices, bufferInfo, pipelineInfo, uniformBuffers, uniformBuffersMemory, transformDescriptor, descriptorPools);
+    InitVulkan(app, instanceInfo, swapchainInfo, renderPass, commandPools, commandInfos, drawSyncPrimitives, vertices, indices, bufferInfo, pipelineInfo, uniformBuffers, uniformBuffersMemory, transformDescriptor, descriptorPools, textureObject);
 }
 
 void OnTermWindow(void)
 {
     DebugLog("App OnTermWindow");
 
-    DeleteVulkan(instanceInfo, commandPools, commandInfos, pipelineInfo, renderPass, swapchainInfo, drawSyncPrimitives, bufferInfo, uniformBuffers, uniformBuffersMemory, transformDescriptor, descriptorPools);
+    DeleteVulkan(instanceInfo, commandPools, commandInfos, pipelineInfo, renderPass, swapchainInfo, drawSyncPrimitives, bufferInfo, uniformBuffers, uniformBuffersMemory, transformDescriptor, descriptorPools, textureObject);
 }
 
 void OnGainFocus(void)

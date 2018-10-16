@@ -61,6 +61,7 @@ add_subdirectory(src/main/glm)
 set(VULKAN_INCLUDE_DIR ${ANDROID_NDK}/sources/third_party/vulkan/src/include)
 set(VULKAN_COMMON_DIR ${ANDROID_NDK}/sources/third_party/vulkan/src/common)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_DEBUG_EXTENTIONS -DVK_USE_PLATFORM_ANDROID_KHR")
+add_definitions("-DSTB_IMAGE_IMPLEMENTATION")
 include_directories(${VULKAN_INCLUDE_DIR})
 include_directories(${VULKAN_COMMON_DIR})
 
