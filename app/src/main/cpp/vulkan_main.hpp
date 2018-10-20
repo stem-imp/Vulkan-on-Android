@@ -46,12 +46,6 @@ typedef struct InstanceInfo {
     bool resolutionChanged;
 } InstanceInfo;
 
-typedef struct ImageInfo {
-    VkImage image;
-    VkDeviceMemory memory;
-    VkImageView view;
-} ImageInfo;
-
 typedef struct SwapchainInfo {
     VkSwapchainKHR swapchain;
     VkExtent2D extent;
@@ -60,8 +54,6 @@ typedef struct SwapchainInfo {
     vector<VkImage> images;
     vector<VkImageView> views;
     vector<VkFramebuffer> framebuffers;
-
-    vector<ImageInfo> depthImageInfo;
 } SwapchainInfo;
 
 typedef struct CommandInfo {
@@ -142,7 +134,10 @@ typedef struct ResourceDescriptor {
 
 typedef struct TextureObject {
     VkSampler sampler;
-    ImageInfo imageInfo;
+    VkImage image;
+    VkImageLayout imageLayout;
+    VkDeviceMemory mem;
+    VkImageView view;
     int32_t tex_width;
     int32_t tex_height;
 } TextureOject;

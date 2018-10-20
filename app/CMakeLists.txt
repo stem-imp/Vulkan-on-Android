@@ -53,7 +53,7 @@ target_link_libraries( # Specifies the target library.
                        ${log-lib} )
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/main/glm)
-add_definitions("-DGLM_FORCE_SIZE_T_LENGTH -DGLM_FORCE_RADIANS -DGLM_FORCE_DEPTH_ZERO_TO_ONE")
+add_definitions("-DGLM_FORCE_SIZE_T_LENGTH -DGLM_FORCE_RADIANS")
 
 # Import the CMakeLists.txt for the glm library
 add_subdirectory(src/main/glm)
