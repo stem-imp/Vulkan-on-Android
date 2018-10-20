@@ -605,6 +605,7 @@ VkShaderModule LoadShaderFromFile(const char* filePath, android_app* app, const 
     size_t fileLength = AAsset_getLength(file);
     vector<char> fileContent(fileLength, 0);
     AAsset_read(file, fileContent.data(), fileLength);
+    AAsset_close(file);
 
     VkShaderModuleCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
