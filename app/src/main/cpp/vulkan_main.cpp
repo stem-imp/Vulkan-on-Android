@@ -687,6 +687,7 @@ VkShaderModule LoadShaderFromFile(const char* filePath, android_app* app, const 
     size_t fileLength = AAsset_getLength(file);
     vector<char> fileContent(fileLength, 0);
     AAsset_read(file, fileContent.data(), fileLength);
+    AAsset_close(file);
 
     VkShaderModuleCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -1098,6 +1099,7 @@ void CreateTextureImage(TextureOject& textureObject, android_app* app, DeviceInf
     size_t fileLength = AAsset_getLength(file);
     vector<stbi_uc> fileContent(fileLength, 0);
     AAsset_read(file, fileContent.data(), fileLength);
+    AAsset_close(file);
 
     uint32_t channelsInFile;
     unsigned char* imageData = stbi_load_from_memory(fileContent.data(), fileLength, reinterpret_cast<int*>(&textureObject.tex_width), reinterpret_cast<int*>(&textureObject.tex_height), reinterpret_cast<int*>(&channelsInFile), STBI_rgb_alpha);
