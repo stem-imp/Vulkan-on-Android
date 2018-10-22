@@ -53,10 +53,12 @@ target_link_libraries( # Specifies the target library.
                        ${log-lib} )
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/main/glm)
-add_definitions("-DGLM_FORCE_SIZE_T_LENGTH -DGLM_FORCE_RADIANS -DGLM_FORCE_DEPTH_ZERO_TO_ONE")
+add_definitions("-DGLM_FORCE_SIZE_T_LENGTH -DGLM_FORCE_RADIANS -DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_LANG_STL11_FORCED")
 
 # Import the CMakeLists.txt for the glm library
 add_subdirectory(src/main/glm)
+
+add_definitions("-DTINYOBJLOADER_IMPLEMENTATION")
 
 set(VULKAN_INCLUDE_DIR ${ANDROID_NDK}/sources/third_party/vulkan/src/include)
 set(VULKAN_COMMON_DIR ${ANDROID_NDK}/sources/third_party/vulkan/src/common)

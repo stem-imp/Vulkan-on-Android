@@ -2,25 +2,35 @@
 
 #include "log.hpp"
 #include "stb_image.h"
+#include "tiny_obj_loader.h"
 #include <gtc/matrix_transform.hpp>
 #include <limits>
 #include <algorithm>
 #include <map>
+#include <unordered_map>
 #include <chrono>
 
 using AndroidNative::Log;
+
 using std::numeric_limits;
 using std::pair;
 using std::search;
 using std::map;
+using std::unordered_map;
 using std::chrono::duration;
 using std::chrono::high_resolution_clock;
 using std::chrono::seconds;
 using std::invalid_argument;
+
 using glm::rotate;
 using glm::lookAt;
 using glm::perspective;
 using glm::radians;
+
+using tinyobj::attrib_t;
+using tinyobj::shape_t;
+using tinyobj::material_t;
+using tinyobj::LoadObj;
 
 const int VK_QUEUE_PRESENT_BIT = 0x00000020;
 
@@ -51,17 +61,19 @@ void CreateDepthBuffer(SwapchainInfo &swapchainInfo, const DeviceInfo &deviceInf
 void CreateTextureImage(TextureOject& textureObject, android_app* app, DeviceInfo& deviceInfo, CommandInfo& shortLivedCommandInfo);
 void CreateTextureImageView(TextureObject& textureObject, VkDevice device);
 void CreateTextureSampler(VkSampler& sampler, VkDevice device);
+
+void LoadModel(const char* filePath, vector<VertexV1>& vertices, vector<uint32_t>& indices, float scale = 1);
 void CreateVertexBuffer(vector<VertexV1>& vertices, BufferInfo& bufferInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo);
 void CreateBuffer(DeviceInfo &deviceInfo, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags preferredProperties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
 bool MapMemoryTypeToIndex(const VkPhysicalDevice& physicalDevice, uint32_t memoryRequirements, VkMemoryPropertyFlags preferredProperties, uint32_t& memoryIndex);;
 void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, DeviceInfo &deviceInfo, CommandInfo& commandInfo);
-void CreateIndexBuffer(vector<uint16_t>& indices, BufferInfo& bufferInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo);
+void CreateIndexBuffer(vector<uint32_t>& indices, BufferInfo& bufferInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo);
 
 void CreateUniformBuffers(vector<VkBuffer>& uniformBuffers, vector<VkDeviceMemory>& uniformBuffersMemory, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo);
 void CreateDescriptorPool(VkDescriptorPool& descriptorPool, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo);
 void CreateDescriptorSets(ResourceDescriptor& descriptor, vector<VkBuffer>& uniformBuffers, TextureObject& textureObject, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo);
 
-void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, const DeviceInfo& deviceInfo, CommandInfo& commandInfo, const VkRenderPass& renderPass, const PipelineInfo& pipelineInfo, const BufferInfo& bufferInfo, const vector<uint16_t>& indices, vector<VkDescriptorSet>& descriptorSets);
+void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, const DeviceInfo& deviceInfo, CommandInfo& commandInfo, const VkRenderPass& renderPass, const PipelineInfo& pipelineInfo, const BufferInfo& bufferInfo, const vector<uint32_t>& indices, vector<VkDescriptorSet>& descriptorSets);
 void CreateSharedGraphicsAndPresentSyncPrimitives(const DeviceInfo& deviceInfo, DrawSyncPrimitives& primitives);
 
 void UpdateMVP(vector<VkDeviceMemory>& mvpMemory, uint32_t currentImageIndex, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo);
@@ -69,7 +81,7 @@ void UpdateMVP(vector<VkDeviceMemory>& mvpMemory, uint32_t currentImageIndex, De
 void DeleteSwapchain(const DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo);
 void DeleteRenderData(const InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo);
 
-bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, vector<DrawSyncPrimitives>& primitives, vector<VertexV1>& vertices, vector<uint16_t>& indices, BufferInfo& bufferInfo, PipelineInfo& pipelineInfo, vector<VkBuffer>& uniformBuffers, vector<VkDeviceMemory>& uniformBuffersMemory, ResourceDescriptor& resourceDescriptor, set<VkDescriptorPool>& descriptorPools, TextureOject& textureObject)
+bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, vector<DrawSyncPrimitives>& primitives, vector<VertexV1>& vertices, vector<uint32_t>& indices, BufferInfo& bufferInfo, PipelineInfo& pipelineInfo, vector<VkBuffer>& uniformBuffers, vector<VkDeviceMemory>& uniformBuffersMemory, ResourceDescriptor& resourceDescriptor, set<VkDescriptorPool>& descriptorPools, TextureOject& textureObject)
 {
     if (instanceInfo.initialized) {
         return true;
@@ -137,6 +149,9 @@ bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swa
     CreateDescriptorSetLayout(descriptorSetLayout, instanceInfo.devices[0]);
     CreateGraphicsPipeline(pipelineInfo, app, instanceInfo.devices[0], swapchainInfo, renderPass, descriptorSetLayout);
 
+    vertices.clear();
+    indices.clear();
+    LoadModel((string(app->activity->externalDataPath) + string("/angelyy.obj")).c_str(), vertices, indices, 0.0001220703125f);
     CreateVertexBuffer(vertices, bufferInfo, instanceInfo.devices[0], commandInfos[1]);
     CreateIndexBuffer(indices, bufferInfo, instanceInfo.devices[0], commandInfos[1]);
     CreateUniformBuffers(uniformBuffers, uniformBuffersMemory, instanceInfo.devices[0], swapchainInfo);
@@ -541,7 +556,7 @@ void CreateSwapChain(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainI
     }
 }
 
-void RecreateSwapchain(android_app* app, const InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, const BufferInfo& bufferInfo, const vector<uint16_t>& indices, ResourceDescriptor& resourceDescriptor)
+void RecreateSwapchain(android_app* app, const InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, const BufferInfo& bufferInfo, const vector<uint32_t>& indices, ResourceDescriptor& resourceDescriptor)
 {
     DeleteRenderData(instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo);
     CreateSwapChain(instanceInfo, swapchainInfo);
@@ -687,6 +702,7 @@ VkShaderModule LoadShaderFromFile(const char* filePath, android_app* app, const 
     size_t fileLength = AAsset_getLength(file);
     vector<char> fileContent(fileLength, 0);
     AAsset_read(file, fileContent.data(), fileLength);
+    AAsset_close(file);
 
     VkShaderModuleCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -1094,10 +1110,11 @@ void CreateTextureImage(TextureOject& textureObject, android_app* app, DeviceInf
     VkFormat format = FindSupportedFormat({ VK_FORMAT_R8G8B8A8_UNORM }, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT, deviceInfo.physicalDevice);
 
     // Load image and dump data to the staging buffer.
-    AAsset* file = AAssetManager_open(app->activity->assetManager, "textures/texture.jpg", AASSET_MODE_BUFFER);
+    AAsset* file = AAssetManager_open(app->activity->assetManager, "textures/angelyy01.jpg", AASSET_MODE_BUFFER);
     size_t fileLength = AAsset_getLength(file);
     vector<stbi_uc> fileContent(fileLength, 0);
     AAsset_read(file, fileContent.data(), fileLength);
+    AAsset_close(file);
 
     uint32_t channelsInFile;
     unsigned char* imageData = stbi_load_from_memory(fileContent.data(), fileLength, reinterpret_cast<int*>(&textureObject.tex_width), reinterpret_cast<int*>(&textureObject.tex_height), reinterpret_cast<int*>(&channelsInFile), STBI_rgb_alpha);
@@ -1206,7 +1223,7 @@ void CreateVertexBuffer(vector<VertexV1>& vertices, BufferInfo& bufferInfo, Devi
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
-void CreateIndexBuffer(vector<uint16_t>& indices, BufferInfo& bufferInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo)
+void CreateIndexBuffer(vector<uint32_t>& indices, BufferInfo& bufferInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo)
 {
     VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
 
@@ -1328,7 +1345,7 @@ void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, Devic
     EndOneTimeCommands(commandBuffer, deviceInfo, shortLivedCommandInfo);
 }
 
-void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, const DeviceInfo& deviceInfo, CommandInfo& commandInfo, const VkRenderPass& renderPass, const PipelineInfo& pipelineInfo, const BufferInfo& bufferInfo, const vector<uint16_t>& indices, vector<VkDescriptorSet>& descriptorSets)
+void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, const DeviceInfo& deviceInfo, CommandInfo& commandInfo, const VkRenderPass& renderPass, const PipelineInfo& pipelineInfo, const BufferInfo& bufferInfo, const vector<uint32_t>& indices, vector<VkDescriptorSet>& descriptorSets)
 {
     uint32_t size = swapchainInfo.images.size();
     commandInfo.buffer.resize(size);
@@ -1376,7 +1393,7 @@ void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, 
         VkBuffer vertexBuffers[] = { bufferInfo.vertexBuffer };
         VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(commandInfo.buffer[i], 0, 1, vertexBuffers, offsets);
-        vkCmdBindIndexBuffer(commandInfo.buffer[i], bufferInfo.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+        vkCmdBindIndexBuffer(commandInfo.buffer[i], bufferInfo.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
         vkCmdBindDescriptorSets(commandInfo.buffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineInfo.layout, 0, 1, &descriptorSets[i], 0, nullptr);
 
@@ -1422,7 +1439,7 @@ void CreateSharedGraphicsAndPresentSyncPrimitives(const DeviceInfo& deviceInfo, 
     }
 }
 
-VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, vector<DrawSyncPrimitives>& primitives, const BufferInfo& bufferInfo, const vector<uint16_t>& indices, vector<VkDeviceMemory>& mvpMemory, ResourceDescriptor& resourceDescriptor)
+VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, vector<DrawSyncPrimitives>& primitives, const BufferInfo& bufferInfo, const vector<uint32_t>& indices, vector<VkDeviceMemory>& mvpMemory, ResourceDescriptor& resourceDescriptor)
 {
     DeviceInfo& deviceInfo = instanceInfo.devices[0];
     VkDevice device = deviceInfo.logicalDevices[0];
@@ -1642,9 +1659,9 @@ void UpdateMVP(vector<VkDeviceMemory>& mvpMemory, uint32_t currentImageIndex, De
     float time = duration<float, seconds::period>(currentTime - startTime).count();
 
     MVP mvp = {};
-    mvp.model = rotate(mat4(1.0f), time * radians(90.0f) * 0.125f, vec3(0.0f, 0.0f, 1.0f));
-    mvp.view = lookAt(vec3(0.0f, 2.0f, 3.5f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
-    mvp.projection = perspective(radians(45.0f), swapchainInfo.extent.width / (float) swapchainInfo.extent.height, 0.1f, 10.0f);
+    mvp.model = rotate(mat4(1.0f), time * radians(90.0f) * 0.25f, vec3(0.0f, 0.0f, 1.0f));
+    mvp.view = lookAt(vec3(0.0f, -6.0f, 3.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    mvp.projection = perspective(radians(45.0f), swapchainInfo.extent.width / (float) swapchainInfo.extent.height, 0.1f, 16.0f);
     mvp.projection[1][1] *= -1;
 
     VkDevice device = deviceInfo.logicalDevices[0];
@@ -1740,4 +1757,61 @@ void CreateDepthBuffer(SwapchainInfo &swapchainInfo, const DeviceInfo &deviceInf
         swapchainInfo.depthImageInfo[i].view = CreateImageView(swapchainInfo.depthImageInfo[i].image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, deviceInfo.logicalDevices[0]);
         TransitionImageLayout(swapchainInfo.depthImageInfo[i].image, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, commandInfo, deviceInfo);
     }
+}
+
+void LoadModel(const char* filePath, vector<VertexV1>& vertices, vector<uint32_t>& indices, float scale)
+{
+    attrib_t attrib;
+    vector<shape_t> shapes;
+    vector<material_t> materials;
+    string warn, err;
+
+    if (!LoadObj(&attrib, &shapes, &materials, &warn, &err, filePath)) {
+        throw runtime_error(err);
+    }
+
+    unordered_map<VertexV1, uint32_t> uniqueVertices = {};
+    for (const auto& shape : shapes) {
+        for (const auto& index : shape.mesh.indices) {
+            VertexV1 vertex = {};
+
+            vertex.pos = {
+                attrib.vertices[3 * index.vertex_index + 0] * scale,
+                attrib.vertices[3 * index.vertex_index + 1] * scale,
+                attrib.vertices[3 * index.vertex_index + 2] * scale
+            };
+            vertex.texCoord = {
+                attrib.texcoords[2 * index.texcoord_index + 0],
+                1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+            };
+            vertex.color = { 1.0f, 1.0f, 1.0f };
+
+            if (uniqueVertices.count(vertex) == 0) {
+                uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+                vertices.push_back(vertex);
+            }
+
+            indices.push_back(uniqueVertices[vertex]);
+        }
+    }
+
+    /*for (const auto& shape : shapes) {
+        for (const auto& index : shape.mesh.indices) {
+            VertexV1 vertex = {};
+
+            vertex.pos = {
+                attrib.vertices[3 * index.vertex_index + 0],
+                attrib.vertices[3 * index.vertex_index + 1],
+                attrib.vertices[3 * index.vertex_index + 2]
+            };
+            vertex.texCoord = {
+                attrib.texcoords[2 * index.texcoord_index + 0],
+                1 - attrib.texcoords[2 * index.texcoord_index + 1]
+            };
+            vertex.color = {1.0f, 1.0f, 1.0f};
+
+            vertices.push_back(vertex);
+            indices.push_back(indices.size());
+        }
+    }*/
 }
