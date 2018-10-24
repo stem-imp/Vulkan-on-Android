@@ -21,6 +21,8 @@ using std::chrono::duration;
 using std::chrono::high_resolution_clock;
 using std::chrono::seconds;
 using std::invalid_argument;
+using std::max;
+using std::floor;
 
 using glm::rotate;
 using glm::lookAt;
@@ -49,7 +51,7 @@ SwapchainSupportInfo QuerySwapchainSupport(VkPhysicalDevice physicalDevice, VkSu
 void CreateLogicalDevice(DeviceInfo& deviceInfo, const LayerAndExtension& layerAndExtension);
 void CreateSwapChain(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo);
 void CreateImageViews(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo);
-VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectMask, VkDevice device);
+VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectMask, uint32_t  mipmapLevel, VkDevice device);
 void CreateRenderPass(const InstanceInfo& instanceInfo, const SwapchainInfo& swapchainInfo, VkRenderPass& renderPass);
 void CreateDescriptorSetLayout(VkDescriptorSetLayout& descriptorSetLayout, DeviceInfo& deviceInfo);
 void CreateGraphicsPipeline(PipelineInfo& pipelineInfo, android_app* app, const DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, VkDescriptorSetLayout& descriptorSetLayout);
@@ -59,8 +61,9 @@ void CreateCommandPool(const DeviceInfo& deviceInfo, VkQueueFlagBits family, Com
 void CreateDepthBuffer(SwapchainInfo &swapchainInfo, const DeviceInfo &deviceInfo,
                        CommandInfo &commandInfo);
 void CreateTextureImage(TextureOject& textureObject, android_app* app, DeviceInfo& deviceInfo, CommandInfo& shortLivedCommandInfo);
+void GenerateMipmaps(TextureObject& textureObject, VkFormat imageFormat, const DeviceInfo& deviceInfo, CommandInfo& commandInfo);
 void CreateTextureImageView(TextureObject& textureObject, VkDevice device);
-void CreateTextureSampler(VkSampler& sampler, VkDevice device);
+void CreateTextureSampler(TextureObject& textureObject, VkDevice device);
 
 void LoadModel(const char* filePath, vector<VertexV1>& vertices, vector<uint32_t>& indices, float scale = 1);
 void CreateVertexBuffer(vector<VertexV1>& vertices, BufferInfo& bufferInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo);
@@ -141,7 +144,7 @@ bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swa
 
     CreateTextureImage(textureObject, app, instanceInfo.devices[0], commandInfos[1]);
     CreateTextureImageView(textureObject, instanceInfo.devices[0].logicalDevices[0]);
-    CreateTextureSampler(textureObject.sampler, instanceInfo.devices[0].logicalDevices[0]);
+    CreateTextureSampler(textureObject, instanceInfo.devices[0].logicalDevices[0]);
 
     resourceDescriptor.layouts.clear();
     resourceDescriptor.layouts.push_back(VkDescriptorSetLayout{});
@@ -605,7 +608,7 @@ void CreateImageViews(const InstanceInfo& instanceInfo, SwapchainInfo& swapchain
             string code = to_string(result);
             throw runtime_error("vkCreateImageView: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
         }*/
-        swapchainInfo.views[i] = CreateImageView(swapchainInfo.images[i], swapchainInfo.format, VK_IMAGE_ASPECT_COLOR_BIT, instanceInfo.devices[0].logicalDevices[0]);
+        swapchainInfo.views[i] = CreateImageView(swapchainInfo.images[i], swapchainInfo.format, VK_IMAGE_ASPECT_COLOR_BIT, 1, instanceInfo.devices[0].logicalDevices[0]);
     }
 }
 
@@ -982,7 +985,7 @@ void EndOneTimeCommands(VkCommandBuffer commandBuffer, const DeviceInfo& deviceI
     vkFreeCommandBuffers(device, commandInfo.pool, 1, &commandBuffer);
 }
 
-void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, CommandInfo& commandInfo, const DeviceInfo& deviceInfo)
+void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipmapLevel, CommandInfo& commandInfo, const DeviceInfo& deviceInfo)
 {
     VkCommandBuffer commandBuffer = BeginOneTimeCommands(commandInfo, deviceInfo);
 
@@ -995,7 +998,7 @@ void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayo
     barrier.image = image;
     //barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.levelCount = mipmapLevel;
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = 1;
 
@@ -1039,7 +1042,7 @@ void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayo
     EndOneTimeCommands(commandBuffer, deviceInfo, commandInfo);
 }
 
-void CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory, const DeviceInfo& deviceInfo)
+void CreateImage(uint32_t width, uint32_t height, uint32_t mipmapLevel, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory, const DeviceInfo& deviceInfo)
 {
     VkImageCreateInfo imageInfo = {};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -1047,7 +1050,7 @@ void CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling
     imageInfo.extent.width = width;
     imageInfo.extent.height = height;
     imageInfo.extent.depth = 1;
-    imageInfo.mipLevels = 1;
+    imageInfo.mipLevels = mipmapLevel;
     imageInfo.arrayLayers = 1;
     imageInfo.format = format;
     imageInfo.tiling = tiling;
@@ -1119,6 +1122,7 @@ void CreateTextureImage(TextureOject& textureObject, android_app* app, DeviceInf
     uint32_t channelsInFile;
     unsigned char* imageData = stbi_load_from_memory(fileContent.data(), fileLength, reinterpret_cast<int*>(&textureObject.tex_width), reinterpret_cast<int*>(&textureObject.tex_height), reinterpret_cast<int*>(&channelsInFile), STBI_rgb_alpha);
     VkDeviceSize imageSize = textureObject.tex_width * textureObject.tex_height * 4;
+    textureObject.mipmapLevel = static_cast<uint32_t>(floor(log2(max(textureObject.tex_width, textureObject.tex_height)))) + 1;
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
@@ -1132,16 +1136,94 @@ void CreateTextureImage(TextureOject& textureObject, android_app* app, DeviceInf
 
     stbi_image_free(imageData);
 
-    CreateImage(textureObject.tex_width, textureObject.tex_height, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureObject.imageInfo.image, textureObject.imageInfo.memory, deviceInfo);
-    TransitionImageLayout(textureObject.imageInfo.image, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, shortLivedCommandInfo, deviceInfo);
-    CopyBufferToImage(stagingBuffer, textureObject.imageInfo.image, static_cast<uint32_t>(textureObject.tex_width), static_cast<uint32_t>(textureObject.tex_height), shortLivedCommandInfo, deviceInfo);
-    TransitionImageLayout(textureObject.imageInfo.image, format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, shortLivedCommandInfo, deviceInfo);
+    CreateImage(textureObject.tex_width, textureObject.tex_height, textureObject.mipmapLevel, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureObject.imageInfo.image, textureObject.imageInfo.memory, deviceInfo);
+    TransitionImageLayout(textureObject.imageInfo.image, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, textureObject.mipmapLevel, shortLivedCommandInfo, deviceInfo);
+    CopyBufferToImage(stagingBuffer, textureObject.imageInfo.image, textureObject.tex_width, textureObject.tex_height, shortLivedCommandInfo, deviceInfo);
+
+    // Transition to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL after generating mipmaps.
+    //TransitionImageLayout(textureObject.imageInfo.image, format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, textureObject.mipmapLevel, shortLivedCommandInfo, deviceInfo);
 
     vkDestroyBuffer(device, stagingBuffer, nullptr);
     vkFreeMemory(device, stagingBufferMemory, nullptr);
+
+    GenerateMipmaps(textureObject, format, deviceInfo, shortLivedCommandInfo);
 }
 
-VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectMask, VkDevice device)
+void GenerateMipmaps(TextureObject& textureObject, VkFormat imageFormat, const DeviceInfo& deviceInfo, CommandInfo& commandInfo)
+{
+    // Check if image format supports linear blitting
+    VkFormatProperties formatProperties;
+    vkGetPhysicalDeviceFormatProperties(deviceInfo.physicalDevice, imageFormat, &formatProperties);
+
+    if ((formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT)) {
+        textureObject.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    } else {
+        InfoLog("Texture image format does not support linear blitting.");
+        textureObject.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    }
+
+    VkCommandBuffer commandBuffer = BeginOneTimeCommands(commandInfo, deviceInfo);
+
+    VkImageMemoryBarrier barrier = {};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.image = textureObject.imageInfo.image;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+    barrier.subresourceRange.levelCount = 1;
+
+    int32_t mipWidth = (int32_t)textureObject.tex_width;
+    int32_t mipHeight = (int32_t)textureObject.tex_height;
+
+    for (uint32_t i = 1; i < textureObject.mipmapLevel; i++) {
+        barrier.subresourceRange.baseMipLevel = i - 1;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+        VkImageBlit blit = {};
+        blit.srcOffsets[0] = { 0, 0, 0 };
+        blit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
+        blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        blit.srcSubresource.mipLevel = i - 1;
+        blit.srcSubresource.baseArrayLayer = 0;
+        blit.srcSubresource.layerCount = 1;
+        blit.dstOffsets[0] = { 0, 0, 0 };
+        mipWidth = mipWidth > 1 ? mipWidth / 2 : 1;
+        mipHeight = mipHeight > 1 ? mipHeight / 2 : 1;
+        blit.dstOffsets[1] = { mipWidth, mipHeight, 1 };
+        blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        blit.dstSubresource.mipLevel = i;
+        blit.dstSubresource.baseArrayLayer = 0;
+        blit.dstSubresource.layerCount = 1;
+
+        vkCmdBlitImage(commandBuffer, textureObject.imageInfo.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, textureObject.imageInfo.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+    }
+
+    barrier.subresourceRange.baseMipLevel = textureObject.mipmapLevel - 1;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+    EndOneTimeCommands(commandBuffer, deviceInfo, commandInfo);
+}
+
+VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectMask, uint32_t mipmapLevel, VkDevice device)
 {
     VkImageViewCreateInfo viewInfo = {};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -1154,7 +1236,7 @@ VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags a
     viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
     viewInfo.subresourceRange.aspectMask = aspectMask;
     viewInfo.subresourceRange.baseMipLevel = 0;
-    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.levelCount = mipmapLevel;
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
 
@@ -1170,25 +1252,29 @@ VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags a
 
 void CreateTextureImageView(TextureObject& textureObject, VkDevice device)
 {
-    textureObject.imageInfo.view = CreateImageView(textureObject.imageInfo.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, device);
+    textureObject.imageInfo.view = CreateImageView(textureObject.imageInfo.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, textureObject.mipmapLevel, device);
 }
 
-void CreateTextureSampler(VkSampler& sampler, VkDevice device)
+void CreateTextureSampler(TextureObject& textureObject, VkDevice device)
 {
+    VkSampler& sampler = textureObject.sampler;
     VkSamplerCreateInfo samplerInfo = {};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     samplerInfo.magFilter = VK_FILTER_LINEAR;
     samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.mipmapMode = textureObject.mipmapMode;
     samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.mipLodBias = 0;
     samplerInfo.anisotropyEnable = VK_TRUE;
     samplerInfo.maxAnisotropy = 16;
-    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-    samplerInfo.unnormalizedCoordinates = VK_FALSE;
     samplerInfo.compareEnable = VK_FALSE;
     samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.minLod = 0;
+    samplerInfo.maxLod = textureObject.mipmapLevel;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
 
     VkResult result = vkCreateSampler(device, &samplerInfo, nullptr, &sampler);
     if (result != VK_SUCCESS) {
@@ -1653,15 +1739,15 @@ void CreateUniformBuffers(vector<VkBuffer>& uniformBuffers, vector<VkDeviceMemor
 
 void UpdateMVP(vector<VkDeviceMemory>& mvpMemory, uint32_t currentImageIndex, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo)
 {
-    static auto startTime = high_resolution_clock::now();
+    //static auto startTime = high_resolution_clock::now();
 
-    auto currentTime = high_resolution_clock::now();
-    float time = duration<float, seconds::period>(currentTime - startTime).count();
+    //auto currentTime = high_resolution_clock::now();
+    //float time = duration<float, seconds::period>(currentTime - startTime).count();
 
     MVP mvp = {};
-    mvp.model = rotate(mat4(1.0f), time * radians(90.0f) * 0.25f, vec3(0.0f, 0.0f, 1.0f));
+    mvp.model = rotate(mat4(1.0f), radians(180.0f)/*time * radians(90.0f) * 0.0f*/, vec3(0.0f, 0.0f, 1.0f));
     mvp.view = lookAt(vec3(0.0f, -6.0f, 3.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
-    mvp.projection = perspective(radians(45.0f), swapchainInfo.extent.width / (float) swapchainInfo.extent.height, 0.1f, 16.0f);
+    mvp.projection = perspective(radians(30.0f), swapchainInfo.extent.width / (float) swapchainInfo.extent.height, 0.1f, 16.0f);
     mvp.projection[1][1] *= -1;
 
     VkDevice device = deviceInfo.logicalDevices[0];
@@ -1753,9 +1839,9 @@ void CreateDepthBuffer(SwapchainInfo &swapchainInfo, const DeviceInfo &deviceInf
 
     swapchainInfo.depthImageInfo.resize(swapchainInfo.images.size());
     for (size_t i = 0; i < swapchainInfo.images.size(); i++) {
-        CreateImage(swapchainInfo.extent.width, swapchainInfo.extent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, swapchainInfo.depthImageInfo[i].image, swapchainInfo.depthImageInfo[i].memory, deviceInfo);
-        swapchainInfo.depthImageInfo[i].view = CreateImageView(swapchainInfo.depthImageInfo[i].image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, deviceInfo.logicalDevices[0]);
-        TransitionImageLayout(swapchainInfo.depthImageInfo[i].image, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, commandInfo, deviceInfo);
+        CreateImage(swapchainInfo.extent.width, swapchainInfo.extent.height, 1, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, swapchainInfo.depthImageInfo[i].image, swapchainInfo.depthImageInfo[i].memory, deviceInfo);
+        swapchainInfo.depthImageInfo[i].view = CreateImageView(swapchainInfo.depthImageInfo[i].image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1, deviceInfo.logicalDevices[0]);
+        TransitionImageLayout(swapchainInfo.depthImageInfo[i].image, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 1, commandInfo, deviceInfo);
     }
 }
 

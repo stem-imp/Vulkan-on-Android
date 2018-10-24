@@ -162,8 +162,10 @@ typedef struct ResourceDescriptor {
 typedef struct TextureObject {
     VkSampler sampler;
     ImageInfo imageInfo;
-    int32_t tex_width;
-    int32_t tex_height;
+    uint32_t tex_width;
+    uint32_t tex_height;
+    uint32_t mipmapLevel;
+    VkSamplerMipmapMode mipmapMode;
 } TextureOject;
 
 // Initialize vulkan device context
