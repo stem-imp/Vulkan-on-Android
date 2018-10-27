@@ -37,6 +37,7 @@ typedef struct DeviceInfo {
     map<uint32_t, set<int>> indexToFamily;
     map<VkDevice, map<int, vector<QueueInfo>>> queues;
     bool sharedGraphicsAndPresentQueue;
+    VkSampleCountFlagBits sampleCount;
 } DeviceInfo;
 
 typedef struct InstanceInfo {
@@ -65,6 +66,8 @@ typedef struct SwapchainInfo {
     vector<VkFramebuffer> framebuffers;
 
     vector<ImageInfo> depthImageInfo;
+
+    ImageInfo msaa;
 } SwapchainInfo;
 
 typedef struct CommandInfo {

@@ -22,6 +22,7 @@ using std::chrono::high_resolution_clock;
 using std::chrono::seconds;
 using std::invalid_argument;
 using std::max;
+using std::min;
 using std::floor;
 
 using glm::rotate;
@@ -46,6 +47,7 @@ void CreateInstance(InstanceInfo& instanceInfo, const LayerAndExtension& layerAn
 void CreateSurface(InstanceInfo& instanceInfo, ANativeWindow* nativeWindow);
 bool SelectPhysicalDevice(InstanceInfo& instanceInfo, LayerAndExtension& layerAndExtension, const vector<int>& targetQueues, vector<const char*> targetExtensionNames);
 bool IsDeviceSuitable(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, const vector<int>& targetQueues, LayerAndExtension& layerAndExtension, vector<const char*> deviceExtensionNames, DeviceInfo* deviceInfo = nullptr);
+VkSampleCountFlagBits GetMaxUsableSampleCount(VkPhysicalDevice physicalDevice);
 map<int, uint32_t> FindQueueFamiliesIndices(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, const vector<int>& targetQueues);
 SwapchainSupportInfo QuerySwapchainSupport(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface);
 void CreateLogicalDevice(DeviceInfo& deviceInfo, const LayerAndExtension& layerAndExtension);
@@ -58,8 +60,8 @@ void CreateGraphicsPipeline(PipelineInfo& pipelineInfo, android_app* app, const 
 void CreateFrameBuffers(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass renderPass);
 void CreateCommandPool(const DeviceInfo& deviceInfo, VkQueueFlagBits family, CommandInfo& commandInfo);
 
-void CreateDepthBuffer(SwapchainInfo &swapchainInfo, const DeviceInfo &deviceInfo,
-                       CommandInfo &commandInfo);
+void CreateSampleImage(SwapchainInfo& swapchainInfo, const DeviceInfo& deviceInfo, CommandInfo& commandInfo);
+void CreateDepthBuffer(SwapchainInfo& swapchainInfo, const DeviceInfo& deviceInfo, CommandInfo& commandInfo);
 void CreateTextureImage(TextureOject& textureObject, android_app* app, DeviceInfo& deviceInfo, CommandInfo& shortLivedCommandInfo);
 void GenerateMipmaps(TextureObject& textureObject, VkFormat imageFormat, const DeviceInfo& deviceInfo, CommandInfo& commandInfo);
 void CreateTextureImageView(TextureObject& textureObject, VkDevice device);
@@ -139,7 +141,8 @@ bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swa
     commandInfos.push_back(transferCommandInfo);
     commandPools.insert(commandInfos[commandInfos.size() - 1].pool);
 
-    CreateDepthBuffer(swapchainInfo, instanceInfo.devices[0], commandInfos[0]);
+    CreateSampleImage(swapchainInfo, instanceInfo.devices[0], commandInfos[1]);
+    CreateDepthBuffer(swapchainInfo, instanceInfo.devices[0], commandInfos[1]);
     CreateFrameBuffers(instanceInfo, swapchainInfo, renderPass);
 
     CreateTextureImage(textureObject, app, instanceInfo.devices[0], commandInfos[1]);
@@ -240,6 +243,7 @@ bool SelectPhysicalDevice(InstanceInfo& instanceInfo, LayerAndExtension& layerAn
     for (const auto& d : tmpGpus) {
         DeviceInfo devInfo = { .physicalDevice = d };
         if (IsDeviceSuitable(d, instanceInfo.surface, targetQueues, layerAndExtension, targetExtensionNames, &devInfo)) {
+            devInfo.sampleCount = GetMaxUsableSampleCount(d);
             instanceInfo.devices.push_back(devInfo);
         }
     }
@@ -385,6 +389,34 @@ bool IsDeviceSuitable(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, con
         }
     }
     return true;
+}
+
+VkSampleCountFlagBits GetMaxUsableSampleCount(VkPhysicalDevice physicalDevice)
+{
+    VkPhysicalDeviceProperties physicalDeviceProperties;
+    vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
+
+    VkSampleCountFlags counts = min(physicalDeviceProperties.limits.framebufferColorSampleCounts, physicalDeviceProperties.limits.framebufferDepthSampleCounts);
+    if (counts & VK_SAMPLE_COUNT_64_BIT) {
+        return VK_SAMPLE_COUNT_64_BIT;
+    }
+    if (counts & VK_SAMPLE_COUNT_32_BIT) {
+        return VK_SAMPLE_COUNT_32_BIT;
+    }
+    if (counts & VK_SAMPLE_COUNT_16_BIT) {
+        return VK_SAMPLE_COUNT_16_BIT;
+    }
+    if (counts & VK_SAMPLE_COUNT_8_BIT) {
+        return VK_SAMPLE_COUNT_8_BIT;
+    }
+    if (counts & VK_SAMPLE_COUNT_4_BIT) {
+        return VK_SAMPLE_COUNT_4_BIT;
+    }
+    if (counts & VK_SAMPLE_COUNT_2_BIT) {
+        return VK_SAMPLE_COUNT_2_BIT;
+    }
+
+    return VK_SAMPLE_COUNT_1_BIT;
 }
 
 SwapchainSupportInfo QuerySwapchainSupport(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
@@ -566,7 +598,8 @@ void RecreateSwapchain(android_app* app, const InstanceInfo& instanceInfo, vecto
     CreateImageViews(instanceInfo, swapchainInfo);
     CreateRenderPass(instanceInfo, swapchainInfo, renderPass);
     CreateGraphicsPipeline(pipelineInfo, app, instanceInfo.devices[0], swapchainInfo, renderPass, resourceDescriptor.layouts[0]);
-    CreateDepthBuffer(swapchainInfo, instanceInfo.devices[0], commandInfos[0]);
+    CreateSampleImage(swapchainInfo, instanceInfo.devices[0], commandInfos[1]);
+    CreateDepthBuffer(swapchainInfo, instanceInfo.devices[0], commandInfos[1]);
     CreateFrameBuffers(instanceInfo, swapchainInfo, renderPass);
     CreateSharedGraphicsAndPresentCommandBuffers(swapchainInfo, instanceInfo.devices[0], commandInfos[0], renderPass, pipelineInfo, bufferInfo, indices, resourceDescriptor.sets);
 }
@@ -631,23 +664,20 @@ VkFormat FindSupportedFormat(const vector<VkFormat>& candidates, VkImageTiling t
 
 void CreateRenderPass(const InstanceInfo& instanceInfo, const SwapchainInfo& swapchainInfo, VkRenderPass& renderPass)
 {
+    const DeviceInfo& deviceInfo = instanceInfo.devices[0];
     VkAttachmentDescription colorAttachment = {};
     colorAttachment.format = swapchainInfo.format;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachment.samples = deviceInfo.sampleCount;
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    const DeviceInfo& deviceInfo = instanceInfo.devices[0];
-    if (deviceInfo.sharedGraphicsAndPresentQueue) {
-        colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    } else {
-        colorAttachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    }
+    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkAttachmentDescription depthAttachment = {};
     depthAttachment.format = FindSupportedFormat({ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT }, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, deviceInfo.physicalDevice);
-    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    depthAttachment.samples = deviceInfo.sampleCount;
     depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -655,24 +685,44 @@ void CreateRenderPass(const InstanceInfo& instanceInfo, const SwapchainInfo& swa
     depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-    VkAttachmentReference colourReference = {};
-    colourReference.attachment = 0;
-    colourReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    VkAttachmentDescription colorAttachmentResolve = {};
+    colorAttachmentResolve.format = swapchainInfo.format;
+    colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    if (deviceInfo.sharedGraphicsAndPresentQueue) {
+        colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    } else {
+        colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    }
+
+    VkAttachmentReference colorReference = {};
+    colorReference.attachment = 0;
+    colorReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkAttachmentReference depthReference = {};
     depthReference.attachment = 1;
     depthReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+    VkAttachmentReference colorResolveReference = {};
+    colorResolveReference.attachment = 2;
+    colorResolveReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
     VkSubpassDescription subpassDescription = {};
     subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpassDescription.colorAttachmentCount = 1;
-    subpassDescription.pColorAttachments = &colourReference;
+    subpassDescription.pColorAttachments = &colorReference;
     subpassDescription.pDepthStencilAttachment = &depthReference;
+    subpassDescription.pResolveAttachments = &colorResolveReference;
 
-    VkAttachmentDescription attachments[] = { colorAttachment, depthAttachment };
+    VkAttachmentDescription attachments[] = { colorAttachment, depthAttachment, colorAttachmentResolve };
     VkRenderPassCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    createInfo.attachmentCount = 2;
+    createInfo.attachmentCount = 3;
     createInfo.pAttachments = attachments;
     createInfo.subpassCount = 1;
     createInfo.pSubpasses = &subpassDescription;
@@ -788,7 +838,7 @@ void CreateGraphicsPipeline(PipelineInfo& pipelineInfo, android_app* app, const 
 
     VkPipelineMultisampleStateCreateInfo multisampling = {};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampling.rasterizationSamples = deviceInfo.sampleCount;
     multisampling.sampleShadingEnable = VK_FALSE;
 
     VkPipelineDepthStencilStateCreateInfo depthStencil = {};
@@ -856,12 +906,12 @@ void CreateFrameBuffers(const InstanceInfo& instanceInfo, SwapchainInfo& swapcha
     swapchainInfo.framebuffers.resize(size);
     for (size_t i = 0; i < size; i++) {
         VkImageView attachments[] = {
-            swapchainInfo.views[i], swapchainInfo.depthImageInfo[i].view
+            swapchainInfo.msaa.view, swapchainInfo.depthImageInfo[i].view, swapchainInfo.views[i]
         };
         VkFramebufferCreateInfo createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         createInfo.renderPass = renderPass;
-        createInfo.attachmentCount = 2;
+        createInfo.attachmentCount = 3;
         createInfo.pAttachments = attachments;
         createInfo.width = static_cast<uint32_t>(swapchainInfo.extent.width);
         createInfo.height = static_cast<uint32_t>(swapchainInfo.extent.height);
@@ -1033,6 +1083,12 @@ void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayo
 
         sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    } else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     } else {
         throw invalid_argument("Unsupported layout transition.");
     }
@@ -1042,7 +1098,7 @@ void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayo
     EndOneTimeCommands(commandBuffer, deviceInfo, commandInfo);
 }
 
-void CreateImage(uint32_t width, uint32_t height, uint32_t mipmapLevel, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory, const DeviceInfo& deviceInfo)
+void CreateImage(uint32_t width, uint32_t height, uint32_t mipmapLevel, VkFormat format, VkSampleCountFlagBits sampleCount, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory, const DeviceInfo& deviceInfo)
 {
     VkImageCreateInfo imageInfo = {};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -1056,7 +1112,7 @@ void CreateImage(uint32_t width, uint32_t height, uint32_t mipmapLevel, VkFormat
     imageInfo.tiling = tiling;
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     imageInfo.usage = usage;
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.samples = sampleCount;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     VkDevice device = deviceInfo.logicalDevices[0];
@@ -1136,7 +1192,7 @@ void CreateTextureImage(TextureOject& textureObject, android_app* app, DeviceInf
 
     stbi_image_free(imageData);
 
-    CreateImage(textureObject.tex_width, textureObject.tex_height, textureObject.mipmapLevel, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureObject.imageInfo.image, textureObject.imageInfo.memory, deviceInfo);
+    CreateImage(textureObject.tex_width, textureObject.tex_height, textureObject.mipmapLevel, format, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureObject.imageInfo.image, textureObject.imageInfo.memory, deviceInfo);
     TransitionImageLayout(textureObject.imageInfo.image, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, textureObject.mipmapLevel, shortLivedCommandInfo, deviceInfo);
     CopyBufferToImage(stagingBuffer, textureObject.imageInfo.image, textureObject.tex_width, textureObject.tex_height, shortLivedCommandInfo, deviceInfo);
 
@@ -1692,6 +1748,9 @@ void DeleteSwapchain(const DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo)
         vkDestroyImage(device, swapchainInfo.depthImageInfo[i].image, nullptr);
         vkFreeMemory(device, swapchainInfo.depthImageInfo[i].memory, nullptr);
     }
+    vkDestroyImageView(device, swapchainInfo.msaa.view, nullptr);
+    vkDestroyImage(device, swapchainInfo.msaa.image, nullptr);
+    vkFreeMemory(device, swapchainInfo.msaa.memory, nullptr);
     vkDestroySwapchainKHR(device, swapchainInfo.swapchain, nullptr);
 }
 
@@ -1739,14 +1798,14 @@ void CreateUniformBuffers(vector<VkBuffer>& uniformBuffers, vector<VkDeviceMemor
 
 void UpdateMVP(vector<VkDeviceMemory>& mvpMemory, uint32_t currentImageIndex, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo)
 {
-    //static auto startTime = high_resolution_clock::now();
+    /*static auto startTime = high_resolution_clock::now();
 
-    //auto currentTime = high_resolution_clock::now();
-    //float time = duration<float, seconds::period>(currentTime - startTime).count();
+    auto currentTime = high_resolution_clock::now();
+    float time = duration<float, seconds::period>(currentTime - startTime).count();*/
 
     MVP mvp = {};
     mvp.model = rotate(mat4(1.0f), radians(180.0f)/*time * radians(90.0f) * 0.0f*/, vec3(0.0f, 0.0f, 1.0f));
-    mvp.view = lookAt(vec3(0.0f, -6.0f, 3.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    mvp.view = lookAt(vec3(0.0f, 0.0f, 3.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
     mvp.projection = perspective(radians(30.0f), swapchainInfo.extent.width / (float) swapchainInfo.extent.height, 0.1f, 16.0f);
     mvp.projection[1][1] *= -1;
 
@@ -1830,6 +1889,16 @@ void CreateDescriptorSets(ResourceDescriptor& descriptor, vector<VkBuffer>& unif
     }
 }
 
+void CreateSampleImage(SwapchainInfo& swapchainInfo, const DeviceInfo& deviceInfo, CommandInfo& commandInfo)
+{
+    VkFormat colorFormat = swapchainInfo.format;
+
+    CreateImage(swapchainInfo.extent.width, swapchainInfo.extent.height, 1, colorFormat, deviceInfo.sampleCount, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT , swapchainInfo.msaa.image, swapchainInfo.msaa.memory, deviceInfo);
+    swapchainInfo.msaa.view = CreateImageView(swapchainInfo.msaa.image, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1, deviceInfo.logicalDevices[0]);
+
+    TransitionImageLayout(swapchainInfo.msaa.image, colorFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1, commandInfo, deviceInfo);
+}
+
 void CreateDepthBuffer(SwapchainInfo &swapchainInfo, const DeviceInfo &deviceInfo, CommandInfo &commandInfo)
 {
     VkFormat depthFormat = FindSupportedFormat(
@@ -1839,7 +1908,7 @@ void CreateDepthBuffer(SwapchainInfo &swapchainInfo, const DeviceInfo &deviceInf
 
     swapchainInfo.depthImageInfo.resize(swapchainInfo.images.size());
     for (size_t i = 0; i < swapchainInfo.images.size(); i++) {
-        CreateImage(swapchainInfo.extent.width, swapchainInfo.extent.height, 1, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, swapchainInfo.depthImageInfo[i].image, swapchainInfo.depthImageInfo[i].memory, deviceInfo);
+        CreateImage(swapchainInfo.extent.width, swapchainInfo.extent.height, 1, depthFormat, deviceInfo.sampleCount, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, swapchainInfo.depthImageInfo[i].image, swapchainInfo.depthImageInfo[i].memory, deviceInfo);
         swapchainInfo.depthImageInfo[i].view = CreateImageView(swapchainInfo.depthImageInfo[i].image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1, deviceInfo.logicalDevices[0]);
         TransitionImageLayout(swapchainInfo.depthImageInfo[i].image, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 1, commandInfo, deviceInfo);
     }
