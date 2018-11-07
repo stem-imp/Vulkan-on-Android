@@ -16,7 +16,8 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_o
 add_library(native_app_glue STATIC ${ANDROID_NDK}/sources/android/native_app_glue/android_native_app_glue.c)
 
 # now set up compilation options
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Werror")
+set(CMAKE_CXX_clone "${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
 
 # Creates and names a library, sets it as either STATIC
 # or SHARED, and provides the relative paths to its source code.
@@ -62,7 +63,9 @@ add_definitions("-DTINYOBJLOADER_IMPLEMENTATION")
 
 set(VULKAN_INCLUDE_DIR ${ANDROID_NDK}/sources/third_party/vulkan/src/include)
 set(VULKAN_COMMON_DIR ${ANDROID_NDK}/sources/third_party/vulkan/src/common)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_DEBUG_EXTENTIONS -DVK_USE_PLATFORM_ANDROID_KHR")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_DEBUG_EXTENTIONS -DVK_USE_PLATFORM_ANDROID_KHR")
+add_definitions("-DUSE_DEBUG_EXTENTIONS")
+add_definitions("-DVK_USE_PLATFORM_ANDROID_KHR")
 add_definitions("-DSTB_IMAGE_IMPLEMENTATION")
 include_directories(${VULKAN_INCLUDE_DIR})
 include_directories(${VULKAN_COMMON_DIR})
@@ -89,3 +92,5 @@ target_link_libraries( # Specifies the target library.
                        log-cpp
                        android
                        native_app_glue )
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_clone}")
