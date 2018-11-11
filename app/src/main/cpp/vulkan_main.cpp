@@ -906,7 +906,7 @@ void CreateFrameBuffers(const InstanceInfo& instanceInfo, SwapchainInfo& swapcha
     swapchainInfo.framebuffers.resize(size);
     for (size_t i = 0; i < size; i++) {
         VkImageView attachments[] = {
-            swapchainInfo.msaa.view, swapchainInfo.depthImageInfo[i].view, swapchainInfo.views[i]
+            swapchainInfo.msaa.view, swapchainInfo.depthImageInfo[0].view, swapchainInfo.views[i]
         };
         VkFramebufferCreateInfo createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -1537,7 +1537,7 @@ void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, 
         vkCmdBindVertexBuffers(commandInfo.buffer[i], 0, 1, vertexBuffers, offsets);
         vkCmdBindIndexBuffer(commandInfo.buffer[i], bufferInfo.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-        vkCmdBindDescriptorSets(commandInfo.buffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineInfo.layout, 0, 1, &descriptorSets[i], 0, nullptr);
+        vkCmdBindDescriptorSets(commandInfo.buffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineInfo.layout, 0, 1, &descriptorSets[0], 0, nullptr);
 
         vkCmdDrawIndexed(commandInfo.buffer[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
@@ -1743,11 +1743,11 @@ void DeleteSwapchain(const DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo)
         // were acquired from the swapchain. swapchain and all associated VkImage handles are destroyed, and must not be
         // acquired or used any more by the application.
         //vkDestroyImage(device, swapchainInfo.images[i], nullptr);
-
-        vkDestroyImageView(device, swapchainInfo.depthImageInfo[i].view, nullptr);
-        vkDestroyImage(device, swapchainInfo.depthImageInfo[i].image, nullptr);
-        vkFreeMemory(device, swapchainInfo.depthImageInfo[i].memory, nullptr);
     }
+    vkDestroyImageView(device, swapchainInfo.depthImageInfo[0].view, nullptr);
+    vkDestroyImage(device, swapchainInfo.depthImageInfo[0].image, nullptr);
+    vkFreeMemory(device, swapchainInfo.depthImageInfo[0].memory, nullptr);
+
     vkDestroyImageView(device, swapchainInfo.msaa.view, nullptr);
     vkDestroyImage(device, swapchainInfo.msaa.image, nullptr);
     vkFreeMemory(device, swapchainInfo.msaa.memory, nullptr);
@@ -1841,24 +1841,21 @@ void CreateDescriptorPool(VkDescriptorPool& descriptorPool, DeviceInfo& deviceIn
 
 void CreateDescriptorSets(ResourceDescriptor& descriptor, vector<VkBuffer>& uniformBuffers, TextureObject& textureObject, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo)
 {
-    descriptor.layouts.resize(swapchainInfo.images.size(), descriptor.layouts[0]);
     VkDescriptorSetAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocInfo.descriptorPool = descriptor.pool;
-    allocInfo.descriptorSetCount = static_cast<uint32_t>(swapchainInfo.images.size());
+    allocInfo.descriptorSetCount = 1;
     allocInfo.pSetLayouts = descriptor.layouts.data();
 
-    descriptor.sets.resize(swapchainInfo.images.size());
+    descriptor.sets.resize(1);
     VkDevice device = deviceInfo.logicalDevices[0];
     VkResult result = vkAllocateDescriptorSets(device, &allocInfo, descriptor.sets.data());
     if (result != VK_SUCCESS) {
         string code = to_string(result);
         throw runtime_error("vkAllocateDescriptorSets: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
     }
-    // Avoid destroying the same descriptor layout.
-    descriptor.layouts.resize(1);
 
-    for (size_t i = 0; i < swapchainInfo.images.size(); i++) {
+    for (size_t i = 0; i < 1; i++) {
         VkDescriptorBufferInfo bufferInfo = {};
         bufferInfo.buffer = uniformBuffers[i];
         bufferInfo.offset = 0;
@@ -1907,8 +1904,8 @@ void CreateDepthBuffer(SwapchainInfo &swapchainInfo, const DeviceInfo &deviceInf
         VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, deviceInfo.physicalDevice
     );
 
-    swapchainInfo.depthImageInfo.resize(swapchainInfo.images.size());
-    for (size_t i = 0; i < swapchainInfo.images.size(); i++) {
+    swapchainInfo.depthImageInfo.resize(1/*swapchainInfo.images.size()*/);
+    for (size_t i = 0; i < 1/*swapchainInfo.images.size()*/; i++) {
         CreateImage(swapchainInfo.extent.width, swapchainInfo.extent.height, 1, depthFormat, deviceInfo.sampleCount, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, swapchainInfo.depthImageInfo[i].image, swapchainInfo.depthImageInfo[i].memory, deviceInfo);
         swapchainInfo.depthImageInfo[i].view = CreateImageView(swapchainInfo.depthImageInfo[i].image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1, deviceInfo.logicalDevices[0]);
         TransitionImageLayout(swapchainInfo.depthImageInfo[i].image, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 1, commandInfo, deviceInfo);
