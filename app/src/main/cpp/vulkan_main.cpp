@@ -1670,10 +1670,8 @@ void DeleteVulkan(InstanceInfo& instanceInfo, set<VkCommandPool>& commandPools, 
     for (auto& p : descriptorPools) {
         vkDestroyDescriptorPool(device, p, nullptr);
     }
-    for (size_t i = 0; i < swapchainInfo.images.size(); i++) {
-        vkDestroyBuffer(device, uniformBuffers[i], nullptr);
-        vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
-    }
+    vkDestroyBuffer(device, uniformBuffers[0], nullptr);
+    vkFreeMemory(device, uniformBuffersMemory[0], nullptr);
 
     vkDestroyBuffer(device, bufferInfo.indexBuffer, nullptr);
     vkFreeMemory(device, bufferInfo.indexBufferMemory, nullptr);
@@ -1788,12 +1786,10 @@ void CreateUniformBuffers(vector<VkBuffer>& uniformBuffers, vector<VkDeviceMemor
 {
     VkDeviceSize bufferSize = sizeof(MVP);
 
-    uniformBuffers.resize(swapchainInfo.images.size());
-    uniformBuffersMemory.resize(swapchainInfo.images.size());
+    uniformBuffers.resize(1);
+    uniformBuffersMemory.resize(1);
 
-    for (size_t i = 0; i < swapchainInfo.images.size(); i++) {
-        CreateBuffer(deviceInfo, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
-    }
+    CreateBuffer(deviceInfo, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[0], uniformBuffersMemory[0]);
 }
 
 void UpdateMVP(vector<VkDeviceMemory>& mvpMemory, uint32_t currentImageIndex, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo)
@@ -1812,9 +1808,9 @@ void UpdateMVP(vector<VkDeviceMemory>& mvpMemory, uint32_t currentImageIndex, De
 
     VkDevice device = deviceInfo.logicalDevices[0];
     void* data;
-    vkMapMemory(device, mvpMemory[currentImageIndex], 0, sizeof(mvp), 0, &data);
+    vkMapMemory(device, mvpMemory[0], 0, sizeof(mvp), 0, &data);
     memcpy(data, &mvp, sizeof(mvp));
-    vkUnmapMemory(device, mvpMemory[currentImageIndex]);
+    vkUnmapMemory(device, mvpMemory[0]);
 }
 
 void CreateDescriptorPool(VkDescriptorPool& descriptorPool, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo)
