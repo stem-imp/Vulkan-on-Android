@@ -807,7 +807,7 @@ void CreateGraphicsPipeline(PipelineInfo& pipelineInfo, android_app* app, const 
 
     // pTessellationState  ignored.
 
-    VkViewport viewport = {};
+    /*VkViewport viewport = {};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
     viewport.width = (float) swapchainInfo.extent.width;
@@ -817,14 +817,14 @@ void CreateGraphicsPipeline(PipelineInfo& pipelineInfo, android_app* app, const 
 
     VkRect2D scissor = {};
     scissor.offset = {0, 0};
-    scissor.extent = swapchainInfo.extent;
+    scissor.extent = swapchainInfo.extent;*/
 
     VkPipelineViewportStateCreateInfo viewportState = {};
     viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     viewportState.viewportCount = 1;
-    viewportState.pViewports = &viewport;
+    //viewportState.pViewports = &viewport;
     viewportState.scissorCount = 1;
-    viewportState.pScissors = &scissor;
+    //viewportState.pScissors = &scissor;
 
     VkPipelineRasterizationStateCreateInfo rasterizer = {};
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -860,7 +860,11 @@ void CreateGraphicsPipeline(PipelineInfo& pipelineInfo, android_app* app, const 
     colorBlending.attachmentCount = 1;
     colorBlending.pAttachments = &colorBlendAttachment;
 
-    // pDynamicState ignored.
+    VkDynamicState dynamicStateEnables[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+    VkPipelineDynamicStateCreateInfo dynamicState = {};
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount = 2;
+    dynamicState.pDynamicStates = dynamicStateEnables;
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -885,10 +889,12 @@ void CreateGraphicsPipeline(PipelineInfo& pipelineInfo, android_app* app, const 
     pipelineCreateInfo.pMultisampleState = &multisampling;
     pipelineCreateInfo.pDepthStencilState = &depthStencil;
     pipelineCreateInfo.pColorBlendState = &colorBlending;
+    pipelineCreateInfo.pDynamicState = &dynamicState;
     pipelineCreateInfo.layout = pipelineInfo.layout;
     pipelineCreateInfo.renderPass = renderPass;
     pipelineCreateInfo.subpass = 0;
     pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
+    pipelineCreateInfo.basePipelineIndex = -1;
 
     result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipelineInfo.pipeline);
     if (result != VK_SUCCESS) {
@@ -1508,6 +1514,13 @@ void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, 
     clearValues[0].color.float32[2] = 0.9f;
     clearValues[0].color.float32[3] = 1.0f;
     clearValues[1].depthStencil = { 1.0f, 0 };
+
+    VkViewport viewport = {};
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    VkRect2D scissor = {};
+
     VkCommandBufferBeginInfo beginInfo = {};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
@@ -1530,6 +1543,18 @@ void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, 
 
         vkCmdBeginRenderPass(commandInfo.buffer[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = (float) swapchainInfo.extent.width / 2;
+        viewport.height = (float) swapchainInfo.extent.height;
+        vkCmdSetViewport(commandInfo.buffer[i], 0, 1, &viewport);
+
+        scissor.offset = { 0, 0 };
+        //scissor.extent = swapchainInfo.extent;
+        scissor.extent.width = viewport.width;
+        scissor.extent.height = viewport.height;
+        vkCmdSetScissor(commandInfo.buffer[i], 0, 1, &scissor);
+
         vkCmdBindPipeline(commandInfo.buffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineInfo.pipeline);
 
         VkBuffer vertexBuffers[] = { bufferInfo.vertexBuffer };
@@ -1540,6 +1565,23 @@ void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, 
         vkCmdBindDescriptorSets(commandInfo.buffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineInfo.layout, 0, 1, &descriptorSets[0], 0, nullptr);
 
         vkCmdDrawIndexed(commandInfo.buffer[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+
+        /////////
+        viewport.x = (float) swapchainInfo.extent.width / 2;
+        viewport.y = 0.0f;
+        viewport.width = (float) swapchainInfo.extent.width / 2;
+        viewport.height = (float) swapchainInfo.extent.height;
+        vkCmdSetViewport(commandInfo.buffer[i], 0, 1, &viewport);
+
+        scissor.offset = { (int32_t)viewport.width, 0 };
+        //scissor.extent = swapchainInfo.extent;
+        scissor.extent.width = viewport.width;
+        scissor.extent.height = viewport.height;
+        vkCmdSetScissor(commandInfo.buffer[i], 0, 1, &scissor);
+
+        vkCmdBindDescriptorSets(commandInfo.buffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineInfo.layout, 0, 1, &descriptorSets[0], 0, nullptr);
+        vkCmdDrawIndexed(commandInfo.buffer[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+        /////////
 
         vkCmdEndRenderPass(commandInfo.buffer[i]);
 
