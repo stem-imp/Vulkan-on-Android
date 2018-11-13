@@ -157,7 +157,7 @@ bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swa
 
     vertices.clear();
     indices.clear();
-    LoadModel((string(app->activity->externalDataPath) + string("/angelyy.obj")).c_str(), vertices, indices, 0.0001220703125f);
+    LoadModel((string(app->activity->externalDataPath) + string("/Traven.obj")).c_str(), vertices, indices, 0.0078125f);
     CreateVertexBuffer(vertices, bufferInfo, instanceInfo.devices[0], commandInfos[1]);
     CreateIndexBuffer(indices, bufferInfo, instanceInfo.devices[0], commandInfos[1]);
     CreateUniformBuffers(uniformBuffers, uniformBuffersMemory, instanceInfo.devices[0], swapchainInfo);
@@ -1169,7 +1169,7 @@ void CreateTextureImage(TextureOject& textureObject, android_app* app, DeviceInf
     VkFormat format = FindSupportedFormat({ VK_FORMAT_R8G8B8A8_UNORM }, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT, deviceInfo.physicalDevice);
 
     // Load image and dump data to the staging buffer.
-    AAsset* file = AAssetManager_open(app->activity->assetManager, "textures/angelyy01.jpg", AASSET_MODE_BUFFER);
+    AAsset* file = AAssetManager_open(app->activity->assetManager, "tavern/textures/Main_Pallete.png", AASSET_MODE_BUFFER);
     size_t fileLength = AAsset_getLength(file);
     vector<stbi_uc> fileContent(fileLength, 0);
     AAsset_read(file, fileContent.data(), fileLength);
@@ -1804,9 +1804,10 @@ void UpdateMVP(vector<VkDeviceMemory>& mvpMemory, uint32_t currentImageIndex, De
     float time = duration<float, seconds::period>(currentTime - startTime).count();*/
 
     MVP mvp = {};
-    mvp.model = rotate(mat4(1.0f), radians(180.0f)/*time * radians(90.0f) * 0.0f*/, vec3(0.0f, 0.0f, 1.0f));
+    //mvp.model = rotate(mat4(1.0f), /*radians(180.0f)*/time * radians(90.0f) * 0.0f, vec3(0.0f, 0.0f, 1.0f));
+    mvp.model = rotate(mat4(1.0f), radians(45.0f), vec3(0.0f, 1.0f, 0.0f));
     mvp.view = lookAt(vec3(0.0f, 0.0f, 3.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
-    mvp.projection = perspective(radians(30.0f), swapchainInfo.extent.width / (float) swapchainInfo.extent.height, 0.1f, 16.0f);
+    mvp.projection = perspective(radians(60.0f), swapchainInfo.extent.width / (float) swapchainInfo.extent.height, 0.1f, 32.0f);
     mvp.projection[1][1] *= -1;
 
     VkDevice device = deviceInfo.logicalDevices[0];
