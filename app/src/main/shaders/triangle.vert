@@ -4,9 +4,12 @@
 
 layout(binding = 0) uniform MVP {
     mat4 model;
+} mvp;
+
+layout(binding = 1) uniform DynamicVP {
     mat4 view;
     mat4 projection;
-} mvp;
+} dynamicVP;
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inColor;
@@ -17,7 +20,7 @@ layout(location = 1) out vec2 fragTexCoord;
 
 void main()
 {
-   gl_Position = mvp.projection * mvp.view * mvp.model * vec4(inPosition, 1.0);
+   gl_Position = dynamicVP.projection * dynamicVP.view * mvp.model * vec4(inPosition, 1.0);
    fragColor = inColor;
    fragTexCoord = inTexCoord;
 }

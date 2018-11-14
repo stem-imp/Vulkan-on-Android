@@ -43,6 +43,11 @@ typedef struct SwapchainSupportInfo {
     vector<VkPresentModeKHR> presentModes;
 } SwapchainSupportInfo;
 
+VkBuffer dynamicVPBuff;
+VkDeviceMemory dynamicVPMem;
+VPDynamic* dynamicVP;
+size_t dynamicAlignment;
+
 void CreateInstance(InstanceInfo& instanceInfo, const LayerAndExtension& layerAndExtension);
 void CreateSurface(InstanceInfo& instanceInfo, ANativeWindow* nativeWindow);
 bool SelectPhysicalDevice(InstanceInfo& instanceInfo, LayerAndExtension& layerAndExtension, const vector<int>& targetQueues, vector<const char*> targetExtensionNames);
@@ -69,7 +74,7 @@ void CreateTextureSampler(TextureObject& textureObject, VkDevice device);
 
 void LoadModel(const char* filePath, vector<VertexV1>& vertices, vector<uint32_t>& indices, float scale = 1);
 void CreateVertexBuffer(vector<VertexV1>& vertices, BufferInfo& bufferInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo);
-void CreateBuffer(DeviceInfo &deviceInfo, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags preferredProperties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
+VkMemoryRequirements CreateBuffer(DeviceInfo &deviceInfo, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags preferredProperties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
 bool MapMemoryTypeToIndex(const VkPhysicalDevice& physicalDevice, uint32_t memoryRequirements, VkMemoryPropertyFlags preferredProperties, uint32_t& memoryIndex);;
 void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, DeviceInfo &deviceInfo, CommandInfo& commandInfo);
 void CreateIndexBuffer(vector<uint32_t>& indices, BufferInfo& bufferInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo);
@@ -1396,7 +1401,7 @@ void CreateIndexBuffer(vector<uint32_t>& indices, BufferInfo& bufferInfo, Device
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
-void CreateBuffer(DeviceInfo &deviceInfo, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags preferredProperties, VkBuffer &buffer, VkDeviceMemory &bufferMemory)
+VkMemoryRequirements CreateBuffer(DeviceInfo &deviceInfo, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags preferredProperties, VkBuffer &buffer, VkDeviceMemory &bufferMemory)
 {
     VkBufferCreateInfo bufferInfo = {};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -1425,7 +1430,9 @@ void CreateBuffer(DeviceInfo &deviceInfo, VkDeviceSize size, VkBufferUsageFlags 
         throw runtime_error("vkAllocateMemory: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
     }
 
-    vkBindBufferMemory(device, buffer, bufferMemory, 0);
+    result = vkBindBufferMemory(device, buffer, bufferMemory, 0);
+
+    return memRequirements;
 }
 
 bool MapMemoryTypeToIndex(const VkPhysicalDevice& physicalDevice, uint32_t memoryRequirements, VkMemoryPropertyFlags preferredProperties, uint32_t& memoryIndex)
@@ -1496,6 +1503,12 @@ void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, Devic
 void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, const DeviceInfo& deviceInfo, CommandInfo& commandInfo, const VkRenderPass& renderPass, const PipelineInfo& pipelineInfo, const BufferInfo& bufferInfo, const vector<uint32_t>& indices, vector<VkDescriptorSet>& descriptorSets)
 {
     uint32_t size = swapchainInfo.images.size();
+
+    if (commandInfo.buffer.size() == size) {
+        vkFreeCommandBuffers(deviceInfo.logicalDevices[0], commandInfo.pool, size, commandInfo.buffer.data());
+        commandInfo.buffer.resize(0);
+    }
+
     commandInfo.buffer.resize(size);
     VkCommandBufferAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -1562,7 +1575,8 @@ void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, 
         vkCmdBindVertexBuffers(commandInfo.buffer[i], 0, 1, vertexBuffers, offsets);
         vkCmdBindIndexBuffer(commandInfo.buffer[i], bufferInfo.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-        vkCmdBindDescriptorSets(commandInfo.buffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineInfo.layout, 0, 1, &descriptorSets[0], 0, nullptr);
+        uint32_t dynamicOffsets = 0;
+        vkCmdBindDescriptorSets(commandInfo.buffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineInfo.layout, 0, 1, &descriptorSets[0], 1, &dynamicOffsets);
 
         vkCmdDrawIndexed(commandInfo.buffer[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
@@ -1579,7 +1593,8 @@ void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, 
         scissor.extent.height = viewport.height;
         vkCmdSetScissor(commandInfo.buffer[i], 0, 1, &scissor);
 
-        vkCmdBindDescriptorSets(commandInfo.buffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineInfo.layout, 0, 1, &descriptorSets[0], 0, nullptr);
+        dynamicOffsets = dynamicAlignment;
+        vkCmdBindDescriptorSets(commandInfo.buffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineInfo.layout, 0, 1, &descriptorSets[0], 1, &dynamicOffsets);
         vkCmdDrawIndexed(commandInfo.buffer[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
         /////////
 
@@ -1712,8 +1727,12 @@ void DeleteVulkan(InstanceInfo& instanceInfo, set<VkCommandPool>& commandPools, 
     for (auto& p : descriptorPools) {
         vkDestroyDescriptorPool(device, p, nullptr);
     }
+
     vkDestroyBuffer(device, uniformBuffers[0], nullptr);
     vkFreeMemory(device, uniformBuffersMemory[0], nullptr);
+    vkUnmapMemory(device, dynamicVPMem);
+    vkDestroyBuffer(device, dynamicVPBuff, nullptr);
+    vkFreeMemory(device, dynamicVPMem, nullptr);
 
     vkDestroyBuffer(device, bufferInfo.indexBuffer, nullptr);
     vkFreeMemory(device, bufferInfo.indexBufferMemory, nullptr);
@@ -1803,17 +1822,24 @@ void CreateDescriptorSetLayout(VkDescriptorSetLayout& descriptorSetLayout, Devic
     uboBinding.pImmutableSamplers = nullptr;
     uboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
+    VkDescriptorSetLayoutBinding uboDynamicBinding = {};
+    uboDynamicBinding.binding = 1;
+    uboDynamicBinding.descriptorCount = 1;
+    uboDynamicBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    uboDynamicBinding.pImmutableSamplers = nullptr;
+    uboDynamicBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
     VkDescriptorSetLayoutBinding samplerBinding = {};
-    samplerBinding.binding = 1;
+    samplerBinding.binding = 2;
     samplerBinding.descriptorCount = 1;
     samplerBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     samplerBinding.pImmutableSamplers = nullptr;
     samplerBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    VkDescriptorSetLayoutBinding binding[] = { uboBinding, samplerBinding };
+    VkDescriptorSetLayoutBinding binding[] = { uboBinding, uboDynamicBinding, samplerBinding };
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 2;
+    layoutInfo.bindingCount = 3;
     layoutInfo.pBindings = binding;
 
     VkDevice device = deviceInfo.logicalDevices[0];
@@ -1832,6 +1858,22 @@ void CreateUniformBuffers(vector<VkBuffer>& uniformBuffers, vector<VkDeviceMemor
     uniformBuffersMemory.resize(1);
 
     CreateBuffer(deviceInfo, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[0], uniformBuffersMemory[0]);
+
+    VkPhysicalDeviceProperties physicalDeviceProperties;
+    vkGetPhysicalDeviceProperties(deviceInfo.physicalDevice, &physicalDeviceProperties);
+    VkDeviceSize minUboAlignment = physicalDeviceProperties.limits.minUniformBufferOffsetAlignment;
+    dynamicAlignment = sizeof(VPDynamic);
+    if (minUboAlignment > 0) {
+        dynamicAlignment = (dynamicAlignment + minUboAlignment - 1) / minUboAlignment * minUboAlignment;
+    }
+    bufferSize = dynamicAlignment * 2;
+    //posix_memalign((void**)&dynamicVP, bufferSize, dynamicAlignment);
+    DebugLog("minUniformBufferOffsetAlignment: %d\n", minUboAlignment);
+    DebugLog("dynamicAlignment: %d\n", dynamicAlignment);
+    VkMemoryRequirements memReq = CreateBuffer(deviceInfo, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, dynamicVPBuff, dynamicVPMem);
+    DebugLog("VkMemoryRequirements size: %d\n", memReq.size);
+    VkResult result = vkMapMemory(deviceInfo.logicalDevices[0], dynamicVPMem, 0, memReq.size, 0, (void **)&dynamicVP);
+    UpdateMVP(uniformBuffersMemory, 0, deviceInfo, swapchainInfo);
 }
 
 void UpdateMVP(vector<VkDeviceMemory>& mvpMemory, uint32_t currentImageIndex, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo)
@@ -1844,15 +1886,24 @@ void UpdateMVP(vector<VkDeviceMemory>& mvpMemory, uint32_t currentImageIndex, De
     MVP mvp = {};
     //mvp.model = rotate(mat4(1.0f), /*radians(180.0f)*/time * radians(90.0f) * 0.0f, vec3(0.0f, 0.0f, 1.0f));
     mvp.model = rotate(mat4(1.0f), radians(45.0f), vec3(0.0f, 1.0f, 0.0f));
-    mvp.view = lookAt(vec3(0.0f, 0.0f, 3.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
-    mvp.projection = perspective(radians(60.0f), swapchainInfo.extent.width / (float) swapchainInfo.extent.height, 0.1f, 32.0f);
-    mvp.projection[1][1] *= -1;
+    //mvp.view = lookAt(vec3(0.0f, 0.0f, 3.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    //mvp.projection = perspective(radians(60.0f), swapchainInfo.extent.width / (float) swapchainInfo.extent.height, 0.1f, 32.0f);
+    //mvp.projection[1][1] *= -1;
 
     VkDevice device = deviceInfo.logicalDevices[0];
     void* data;
     vkMapMemory(device, mvpMemory[0], 0, sizeof(mvp), 0, &data);
     memcpy(data, &mvp, sizeof(mvp));
     vkUnmapMemory(device, mvpMemory[0]);
+
+    VPDynamic* base = dynamicVP;
+    base->view = lookAt(vec3(-0.125f, 0.0f, 3.0f), vec3(-0.125f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    base->projection = perspective(radians(60.0f), swapchainInfo.extent.width / (float) swapchainInfo.extent.height, 0.1f, 32.0f);
+    base->projection[1][1] *= -1;
+    base += 1;
+    base->view = lookAt(vec3(0.125f, 0.0f, 3.0f), vec3(0.125f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    base->projection = perspective(radians(60.0f), swapchainInfo.extent.width / (float) swapchainInfo.extent.height, 0.1f, 32.0f);
+    base->projection[1][1] *= -1;
 }
 
 void CreateDescriptorPool(VkDescriptorPool& descriptorPool, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo)
@@ -1899,12 +1950,17 @@ void CreateDescriptorSets(ResourceDescriptor& descriptor, vector<VkBuffer>& unif
         bufferInfo.offset = 0;
         bufferInfo.range = VK_WHOLE_SIZE;
 
+        VkDescriptorBufferInfo bufferDynamicInfo = {};
+        bufferDynamicInfo.buffer = dynamicVPBuff;
+        bufferDynamicInfo.offset = 0;
+        bufferDynamicInfo.range = VK_WHOLE_SIZE;
+
         VkDescriptorImageInfo imageInfo = {};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         imageInfo.imageView = textureObject.imageInfo.view;
         imageInfo.sampler = textureObject.sampler;
 
-        VkWriteDescriptorSet descriptorWrites[] = { {}, {} };
+        VkWriteDescriptorSet descriptorWrites[] = { {}, {}, {} };
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = descriptor.sets[i];
         descriptorWrites[0].dstBinding = 0;
@@ -1917,11 +1973,19 @@ void CreateDescriptorSets(ResourceDescriptor& descriptor, vector<VkBuffer>& unif
         descriptorWrites[1].dstSet = descriptor.sets[i];
         descriptorWrites[1].dstBinding = 1;
         descriptorWrites[1].dstArrayElement = 0;
-        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
         descriptorWrites[1].descriptorCount = 1;
-        descriptorWrites[1].pImageInfo = &imageInfo;
+        descriptorWrites[1].pBufferInfo = &bufferDynamicInfo;
 
-        vkUpdateDescriptorSets(device, 2, descriptorWrites, 0, nullptr);
+        descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[2].dstSet = descriptor.sets[i];
+        descriptorWrites[2].dstBinding = 2;
+        descriptorWrites[2].dstArrayElement = 0;
+        descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[2].descriptorCount = 1;
+        descriptorWrites[2].pImageInfo = &imageInfo;
+
+        vkUpdateDescriptorSets(device, 3, descriptorWrites, 0, nullptr);
     }
 }
 

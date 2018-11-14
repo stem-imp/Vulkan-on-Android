@@ -1,3 +1,4 @@
+//vulkan_main.hpp
 #ifndef VULKAN_MAIN_HPP
 #define VULKAN_MAIN_HPP
 
@@ -152,9 +153,14 @@ namespace std
 
 typedef struct MVP {
     mat4 model;
+    //mat4 view;
+    //mat4 projection;
+} MVP;
+
+typedef struct VPDynamic {
     mat4 view;
     mat4 projection;
-} MVP;
+} VPDynamic;
 
 typedef struct ResourceDescriptor {
     VkDescriptorPool pool;
