@@ -43,6 +43,12 @@ typedef struct SwapchainSupportInfo {
     vector<VkPresentModeKHR> presentModes;
 } SwapchainSupportInfo;
 
+float eyeSeparation = 0.08f;
+const float focalLength = 0.5f;
+const float fov = 90.0f;
+const float zNear = 0.1f;
+const float zFar = 256.0f;
+
 VkBuffer dynamicVPBuff;
 VkDeviceMemory dynamicVPMem;
 VPDynamic* dynamicVP;
@@ -1897,13 +1903,69 @@ void UpdateMVP(vector<VkDeviceMemory>& mvpMemory, uint32_t currentImageIndex, De
     vkUnmapMemory(device, mvpMemory[0]);
 
     VPDynamic* base = dynamicVP;
-    base->view = lookAt(vec3(-0.125f, 0.0f, 3.0f), vec3(-0.125f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    /*base->view = lookAt(vec3(-0.125f, 0.0f, 3.0f), vec3(-0.125f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
     base->projection = perspective(radians(60.0f), swapchainInfo.extent.width / (float) swapchainInfo.extent.height, 0.1f, 32.0f);
     base->projection[1][1] *= -1;
     base += 1;
     base->view = lookAt(vec3(0.125f, 0.0f, 3.0f), vec3(0.125f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
     base->projection = perspective(radians(60.0f), swapchainInfo.extent.width / (float) swapchainInfo.extent.height, 0.1f, 32.0f);
+    base->projection[1][1] *= -1;*/
+
+    // Calculate some variables
+    float aspectRatio = (swapchainInfo.extent.width * 0.5f) / swapchainInfo.extent.height;
+    float wd2 = zNear * tan(radians(fov / 2.0f));
+    float ndfl = zNear / focalLength;
+    float left, right;
+    float top = wd2;
+    float bottom = -wd2;
+
+    // Left eye
+    left = -aspectRatio * wd2 + 0.5f * eyeSeparation * ndfl;
+    right = aspectRatio * wd2 + 0.5f * eyeSeparation * ndfl;
+    base->view = lookAt(vec3(-0.5f * eyeSeparation, 0.0f, 3.0f), vec3(-0.5f * eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    base->projection = glm::frustum(left, right, bottom, top, zNear, zFar);
     base->projection[1][1] *= -1;
+
+    base += 1;
+
+    // Right eye
+    left = -aspectRatio * wd2 - 0.5f * eyeSeparation * ndfl;
+    right = aspectRatio * wd2 - 0.5f * eyeSeparation * ndfl;
+    base->view = lookAt(vec3(0.5f * eyeSeparation, 0.0f, 3.0f), vec3(0.5f * eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    base->projection = glm::frustum(left, right, bottom, top, zNear, zFar);
+    base->projection[1][1] *= -1;
+
+    /*glm::vec3 camFront;
+    camFront.x = -cos(glm::radians(rotation.x)) * sin(glm::radians(rotation.y));
+    camFront.y = sin(glm::radians(rotation.x));
+    camFront.z = cos(glm::radians(rotation.x)) * cos(glm::radians(rotation.y));
+    camFront = glm::normalize(camFront);
+    glm::vec3 camRight = glm::normalize(glm::cross(camFront, glm::vec3(0.0f, 1.0f, 0.0f)));
+
+    glm::mat4 rotM = glm::mat4(1.0f);
+    glm::mat4 transM;
+
+    rotM = glm::rotate(rotM, glm::radians(camera.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+    rotM = glm::rotate(rotM, glm::radians(camera.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+    rotM = glm::rotate(rotM, glm::radians(camera.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+
+    // Left eye
+    left = -aspectRatio * wd2 + 0.5f * eyeSeparation * ndfl;
+    right = aspectRatio * wd2 + 0.5f * eyeSeparation * ndfl;
+
+    transM = glm::translate(glm::mat4(1.0f), camera.position - camRight * (eyeSeparation / 2.0f));
+
+    ubo.projection[0] = glm::frustum(left, right, bottom, top, zNear, zFar);
+    ubo.modelview[0] = rotM * transM;
+
+    // Right eye
+    left = -aspectRatio * wd2 - 0.5f * eyeSeparation * ndfl;
+    right = aspectRatio * wd2 - 0.5f * eyeSeparation * ndfl;
+
+    transM = glm::translate(glm::mat4(1.0f), camera.position + camRight * (eyeSeparation / 2.0f));
+
+    ubo.projection[1] = glm::frustum(left, right, bottom, top, zNear, zFar);
+    ubo.modelview[1] = rotM * transM;*/
 }
 
 void CreateDescriptorPool(VkDescriptorPool& descriptorPool, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo)
