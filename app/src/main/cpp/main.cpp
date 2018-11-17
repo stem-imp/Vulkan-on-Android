@@ -38,7 +38,7 @@ vector<VkDeviceMemory> uniformBuffersMemory;
 //VkDescriptorPool descriptorPool;
 vector<VkDescriptorSet> descriptorSets;
 set<VkDescriptorPool> descriptorPools;
-ResourceDescriptor transformDescriptor;
+vector<ResourceDescriptor> transformDescriptor;
 TextureOject textureObject;
 
 static status OnActivate();
