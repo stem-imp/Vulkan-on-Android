@@ -17,13 +17,19 @@ set<VkCommandPool> commandPools;
 vector<CommandInfo> commandInfos;
 vector<DrawSyncPrimitives> drawSyncPrimitives;
 vector<VertexV1> vertices = {
-    {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-    {{-0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-    {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}},
+    {{-0.5f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+    {{0.5f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}},
+    {{0.0f, 0.8660254f, 0.0f}, {0.0f, 0.0f, 1.0f}},
 };
 vector<uint16_t> indices = { 0, 1, 2 };
 BufferInfo bufferInfo;
 PipelineInfo pipelineInfo;
+
+VkDescriptorSetLayout descriptorSetLayout;
+VkBuffer vpBuffer;
+VkDeviceMemory vpBufferMemory;
+VkDescriptorSet descriptorSets;
+ResourceDescriptor mvpDescriptor;
 
 static status OnActivate();
 static void OnDeactivate();
@@ -90,7 +96,7 @@ status OnStep(android_app* app)
 {
     //DebugLog("App OnStep");
 
-    VkResult result = DrawFrame(app, instanceInfo, swapchainInfo, renderPass, commandInfos, pipelineInfo, drawSyncPrimitives, bufferInfo, indices);
+    VkResult result = DrawFrame(app, instanceInfo, swapchainInfo, renderPass, commandInfos, pipelineInfo, drawSyncPrimitives, bufferInfo, indices, vpBuffer, vpBufferMemory, mvpDescriptor);
     if (result == VK_SUCCESS) {
         return OK;
     } else {
@@ -129,14 +135,14 @@ void OnInitWindow(android_app* app)
 
     instanceInfo.width = ANativeWindow_getWidth(app->window);
     instanceInfo.height = ANativeWindow_getHeight(app->window);
-    InitVulkan(app, instanceInfo, swapchainInfo, renderPass, commandPools, commandInfos, drawSyncPrimitives, vertices, indices, bufferInfo, pipelineInfo);
+    InitVulkan(app, instanceInfo, swapchainInfo, renderPass, commandPools, commandInfos, drawSyncPrimitives, vertices, indices, bufferInfo, pipelineInfo, vpBuffer, vpBufferMemory, mvpDescriptor);
 }
 
 void OnTermWindow(void)
 {
     DebugLog("App OnTermWindow");
 
-    DeleteVulkan(instanceInfo, commandPools, commandInfos, pipelineInfo, renderPass, swapchainInfo, drawSyncPrimitives, bufferInfo);
+    DeleteVulkan(instanceInfo, commandPools, commandInfos, pipelineInfo, renderPass, swapchainInfo, drawSyncPrimitives, bufferInfo, vpBuffer, vpBufferMemory, mvpDescriptor);
 }
 
 void OnGainFocus(void)

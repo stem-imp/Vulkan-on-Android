@@ -4,6 +4,7 @@
 #include <limits>
 #include <algorithm>
 #include <map>
+#include <ext.hpp>
 
 using AndroidNative::Log;
 using std::numeric_limits;
@@ -11,7 +12,17 @@ using std::pair;
 using std::search;
 using std::map;
 
+using glm::lookAt;
+using glm::perspective;
+using glm::radians;
+using glm::translate;
+
 const int VK_QUEUE_PRESENT_BIT = 0x00000020;
+
+VkBuffer dynamicMBuff;
+VkDeviceMemory dynamicMMem;
+MDynamic* dynamicM;
+size_t dynamicAlignment;
 
 typedef struct SwapchainSupportInfo {
     VkSurfaceCapabilitiesKHR capabilities;
@@ -26,26 +37,33 @@ bool IsDeviceSuitable(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, con
 map<int, uint32_t> FindQueueFamiliesIndices(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, const vector<int>& targetQueues);
 SwapchainSupportInfo QuerySwapchainSupport(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface);
 void CreateLogicalDevice(DeviceInfo& deviceInfo, const LayerAndExtension& layerAndExtension);
-void CreateSwapChain(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo);
-void CreateImageViews(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo);
-void CreateRenderPass(const InstanceInfo& instanceInfo, const SwapchainInfo& swapchainInfo, VkRenderPass& renderPass);
-void CreateGraphicsPipeline(PipelineInfo& pipelineInfo, android_app* app, const DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass);
-void CreateFrameBuffers(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass renderPass, VkImageView depthView = VK_NULL_HANDLE);
-void CreateCommandPool(const DeviceInfo& deviceInfo, VkQueueFlagBits family, CommandInfo& commandInfo);
+void CreateSwapChain(InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo);
+void CreateImageViews(InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo);
+void CreateRenderPass(InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass);
+void CreateDescriptorSetLayout(VkDescriptorSetLayout& descriptorSetLayout, VkPipelineLayout& layout, DeviceInfo& deviceInfo);
 
-void CreateVertexBuffer(vector<VertexV1>& vertices, BufferInfo& bufferInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo);
-void CreateBuffer(DeviceInfo &deviceInfo, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags preferredProperties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
+void CreateGraphicsPipeline(PipelineInfo& pipelineInfo, android_app* app, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass);
+void CreateFrameBuffers(InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass renderPass, VkImageView depthView = VK_NULL_HANDLE);
+void CreateCommandPool(DeviceInfo& deviceInfo, VkQueueFlagBits family, CommandInfo& commandInfo);
+
+void CreateVertexBuffer(const vector<VertexV1>& vertices, BufferInfo& bufferInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo);
+VkMemoryRequirements CreateBuffer(DeviceInfo &deviceInfo, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags preferredProperties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
 bool MapMemoryTypeToIndex(VkPhysicalDevice& physicalDevice, uint32_t memoryRequirements, VkMemoryPropertyFlags preferredProperties, uint32_t& memoryIndex);;
 void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, DeviceInfo &deviceInfo, VkCommandPool commandPool);
-void CreateIndexBuffer(vector<uint16_t>& indices, BufferInfo& bufferInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo);
+void CreateIndexBuffer(const vector<uint16_t>& indices, BufferInfo& bufferInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo);
 
-void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, const DeviceInfo& deviceInfo, CommandInfo& commandInfo, const VkRenderPass& renderPass, const PipelineInfo& pipelineInfo, const BufferInfo& bufferInfo, const vector<uint16_t>& indices);
-void CreateSharedGraphicsAndPresentSyncPrimitives(const DeviceInfo& deviceInfo, DrawSyncPrimitives& primitives);
+void CreateUniformBuffer(VkBuffer& vpBuffer, VkDeviceMemory& vpBufferMemory, SwapchainInfo& swapchainInfo, DeviceInfo& deviceInfo);
+void UpdateMVP(VkDeviceMemory& vpMemory, SwapchainInfo& swapchainInfo, DeviceInfo& deviceInfo);
+void CreateDescriptorPool(VkDescriptorPool& descriptorPool, DeviceInfo& deviceInfo);
+void CreateDescriptorSets(ResourceDescriptor& mvpDescriptor, VkBuffer& vpBuffer, VkDeviceMemory& vpBufferMemory, SwapchainInfo& swapchainInfo, DeviceInfo& deviceInfo);
 
-void DeleteSwapchain(const DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo);
-void DeleteRenderData(const InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo);
+void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo, VkRenderPass& renderPass, PipelineInfo& pipelineInfo, BufferInfo& bufferInfo, const vector<uint16_t>& indices, VkDescriptorSet& descriptorSet);
+void CreateSharedGraphicsAndPresentSyncPrimitives(DeviceInfo& deviceInfo, DrawSyncPrimitives& primitives);
 
-bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, vector<DrawSyncPrimitives>& primitives, vector<VertexV1>& vertices, vector<uint16_t>& indices, BufferInfo& bufferInfo, PipelineInfo& pipelineInfo)
+void DeleteSwapchain(DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo);
+void DeleteRenderData(InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, VkBuffer& vpBuffer, VkDeviceMemory& vpBufferMemory, ResourceDescriptor& mvpDescriptor);
+
+bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, vector<DrawSyncPrimitives>& primitives, const vector<VertexV1>& vertices, const vector<uint16_t>& indices, BufferInfo& bufferInfo, PipelineInfo& pipelineInfo, VkBuffer& vpBuffer, VkDeviceMemory& vpBufferMemory, ResourceDescriptor& mvpDescriptor)
 {
     if (instanceInfo.initialized) {
         return true;
@@ -101,13 +119,18 @@ bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swa
     commandInfos.push_back(transferCommandInfo);
     commandPools.insert(commandInfos[commandInfos.size() - 1].pool);
 
+    CreateDescriptorSetLayout(mvpDescriptor.layout, pipelineInfo.layout, instanceInfo.devices[0]);
     CreateGraphicsPipeline(pipelineInfo, app, instanceInfo.devices[0], swapchainInfo, renderPass);
 
     CreateVertexBuffer(vertices, bufferInfo, instanceInfo.devices[0], commandInfos[1]);
     CreateIndexBuffer(indices, bufferInfo, instanceInfo.devices[0], commandInfos[1]);
 
+    CreateUniformBuffer(vpBuffer, vpBufferMemory, swapchainInfo, instanceInfo.devices[0]);
+    CreateDescriptorPool(mvpDescriptor.pool, instanceInfo.devices[0]);
+    CreateDescriptorSets(mvpDescriptor, vpBuffer, vpBufferMemory, swapchainInfo, instanceInfo.devices[0]);
+
     if (instanceInfo.devices[0].sharedGraphicsAndPresentQueue) {
-        CreateSharedGraphicsAndPresentCommandBuffers(swapchainInfo, instanceInfo.devices[0], commandInfos[0], renderPass, pipelineInfo, bufferInfo, indices);
+        CreateSharedGraphicsAndPresentCommandBuffers(swapchainInfo, instanceInfo.devices[0], commandInfos[0], renderPass, pipelineInfo, bufferInfo, indices, mvpDescriptor.set);
         primitives.resize(2);
         for (auto &p : primitives) {
             p.concurrentFrameCount = 2;
@@ -426,7 +449,7 @@ VkPresentModeKHR ChooseSwapchainPresentMode(const vector<VkPresentModeKHR> avail
 
 VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, const InstanceInfo& instanceInfo)
 {
-    if (capabilities.currentExtent.width != numeric_limits<uint32_t>::max()) {
+    if (capabilities.currentExtent.width != numeric_limits<uint32_t>::max() && !instanceInfo.resolutionChanged) {
         return capabilities.currentExtent;
     } else {
         VkExtent2D actualExtent = { static_cast<uint32_t>(instanceInfo.width), static_cast<uint32_t>(instanceInfo.height) };
@@ -438,9 +461,9 @@ VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, const 
     }
 }
 
-void CreateSwapChain(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo)
+void CreateSwapChain(InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo)
 {
-    const DeviceInfo& deviceInfo = instanceInfo.devices[0];
+    DeviceInfo& deviceInfo = instanceInfo.devices[0];
     SwapchainSupportInfo supportInfo = QuerySwapchainSupport(deviceInfo.physicalDevice, instanceInfo.surface);
     VkSurfaceFormatKHR surfaceFormat = ChooseSwapSurfaceFormat(supportInfo.formats, VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR);
     VkPresentModeKHR presentMode = ChooseSwapchainPresentMode(supportInfo.presentModes);
@@ -494,18 +517,24 @@ void CreateSwapChain(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainI
     }
 }
 
-void RecreateSwapchain(android_app* app, const InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, const BufferInfo& bufferInfo, const vector<uint16_t>& indices)
+void RecreateSwapchain(android_app* app, InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, BufferInfo& bufferInfo, const vector<uint16_t>& indices, ResourceDescriptor& mvpDescriptor, VkBuffer& vpBuffer, VkDeviceMemory& vpBufferMemory)
 {
-    DeleteRenderData(instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo);
+    DeleteRenderData(instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo, vpBuffer, vpBufferMemory, mvpDescriptor);
     CreateSwapChain(instanceInfo, swapchainInfo);
     CreateImageViews(instanceInfo, swapchainInfo);
     CreateRenderPass(instanceInfo, swapchainInfo, renderPass);
     CreateGraphicsPipeline(pipelineInfo, app, instanceInfo.devices[0], swapchainInfo, renderPass);
     CreateFrameBuffers(instanceInfo, swapchainInfo, renderPass);
-    CreateSharedGraphicsAndPresentCommandBuffers(swapchainInfo, instanceInfo.devices[0], commandInfos[0], renderPass, pipelineInfo, bufferInfo, indices);
+
+    //CreateUniformBuffer(vpBuffer, vpBufferMemory, swapchainInfo, instanceInfo.devices[0]);
+    //CreateDescriptorSetLayout(mvpDescriptor.layout, pipelineInfo.layout, instanceInfo.devices[0]);
+    //CreateDescriptorPool(mvpDescriptor.pool, instanceInfo.devices[0]);
+    //CreateDescriptorSets(mvpDescriptor, vpBuffer, vpBufferMemory, swapchainInfo, instanceInfo.devices[0]);
+    UpdateMVP(vpBufferMemory, swapchainInfo, instanceInfo.devices[0]);
+    CreateSharedGraphicsAndPresentCommandBuffers(swapchainInfo, instanceInfo.devices[0], commandInfos[0], renderPass, pipelineInfo, bufferInfo, indices, mvpDescriptor.set);
 }
 
-void CreateImageViews(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo)
+void CreateImageViews(InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo)
 {
     uint32_t swapChainImagesCount = 0;
     VkDevice device = instanceInfo.devices[0].logicalDevices[0];
@@ -545,14 +574,14 @@ void CreateImageViews(const InstanceInfo& instanceInfo, SwapchainInfo& swapchain
     }
 }
 
-void CreateRenderPass(const InstanceInfo& instanceInfo, const SwapchainInfo& swapchainInfo, VkRenderPass& renderPass)
+void CreateRenderPass(InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass)
 {
     VkAttachmentDescription attachmentDescriptions = {};
     attachmentDescriptions.format = swapchainInfo.format;
     attachmentDescriptions.samples = VK_SAMPLE_COUNT_1_BIT;
     attachmentDescriptions.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     attachmentDescriptions.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    const DeviceInfo& deviceInfo = instanceInfo.devices[0];
+    DeviceInfo& deviceInfo = instanceInfo.devices[0];
     if (deviceInfo.sharedGraphicsAndPresentQueue) {
         attachmentDescriptions.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         attachmentDescriptions.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
@@ -599,7 +628,7 @@ void CreateRenderPass(const InstanceInfo& instanceInfo, const SwapchainInfo& swa
     }
 }
 
-VkShaderModule LoadShaderFromFile(const char* filePath, android_app* app, const DeviceInfo& deviceInfo)
+VkShaderModule LoadShaderFromFile(const char* filePath, android_app* app, DeviceInfo& deviceInfo)
 {
     AAsset* file = AAssetManager_open(app->activity->assetManager, filePath, AASSET_MODE_BUFFER);
     size_t fileLength = AAsset_getLength(file);
@@ -621,7 +650,44 @@ VkShaderModule LoadShaderFromFile(const char* filePath, android_app* app, const 
     return shader;
 }
 
-void CreateGraphicsPipeline(PipelineInfo& pipelineInfo, android_app* app, const DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass)
+void CreateDescriptorSetLayout(VkDescriptorSetLayout& descriptorSetLayout, VkPipelineLayout& layout, DeviceInfo& deviceInfo)
+{
+    VkDescriptorSetLayoutBinding bindings[] = { {}, {} };
+    bindings[0].binding = 0;
+    bindings[0].descriptorCount = 1;
+    bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    bindings[0].pImmutableSamplers = nullptr;
+    bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    bindings[1].binding = 1;
+    bindings[1].descriptorCount = 1;
+    bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    bindings[1].pImmutableSamplers = nullptr;
+    bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 2;
+    layoutInfo.pBindings = bindings;
+    VkDevice device = deviceInfo.logicalDevices[0];
+    VkResult result = vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout);
+    if (result != VK_SUCCESS) {
+        string code = to_string(result);
+        throw runtime_error("vkCreateDescriptorSetLayout: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
+    }
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+    result = vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &layout);
+    if (result != VK_SUCCESS) {
+        string code = to_string(result);
+        throw runtime_error("vkCreatePipelineLayout: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
+    }
+}
+
+void CreateGraphicsPipeline(PipelineInfo& pipelineInfo, android_app* app, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass)
 {
     // Create shader stage.
     VkShaderModule vertexShader = LoadShaderFromFile("shaders/triangle.vert.spv", app, deviceInfo);
@@ -706,16 +772,16 @@ void CreateGraphicsPipeline(PipelineInfo& pipelineInfo, android_app* app, const 
 
     // pDynamicState ignored.
 
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
-    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 0;
-    pipelineLayoutInfo.pushConstantRangeCount = 0;
-    VkDevice device = deviceInfo.logicalDevices[0];
-    VkResult result = vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineInfo.layout);
-    if (result != VK_SUCCESS) {
-        string code = to_string(result);
-        throw runtime_error("vkCreatePipelineLayout: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
-    }
+//    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+//    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+//    pipelineLayoutInfo.setLayoutCount = 0;
+//    pipelineLayoutInfo.pushConstantRangeCount = 0;
+//    VkDevice device = deviceInfo.logicalDevices[0];
+//    VkResult result = vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineInfo.layout);
+//    if (result != VK_SUCCESS) {
+//        string code = to_string(result);
+//        throw runtime_error("vkCreatePipelineLayout: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
+//    }
 
     VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
     pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -732,7 +798,8 @@ void CreateGraphicsPipeline(PipelineInfo& pipelineInfo, android_app* app, const 
     pipelineCreateInfo.subpass = 0;
     pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-    result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipelineInfo.pipeline);
+    VkDevice device = deviceInfo.logicalDevices[0];
+    VkResult result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipelineInfo.pipeline);
     if (result != VK_SUCCESS) {
         string code = to_string(result);
         throw runtime_error("vkCreateGraphicsPipelines: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
@@ -742,7 +809,7 @@ void CreateGraphicsPipeline(PipelineInfo& pipelineInfo, android_app* app, const 
     vkDestroyShaderModule(device, fragmentShader, nullptr);
 }
 
-void CreateFrameBuffers(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass renderPass, VkImageView depthView)
+void CreateFrameBuffers(InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass renderPass, VkImageView depthView)
 {
     size_t size = swapchainInfo.images.size();
     swapchainInfo.framebuffers.resize(size);
@@ -767,7 +834,7 @@ void CreateFrameBuffers(const InstanceInfo& instanceInfo, SwapchainInfo& swapcha
     }
 }
 
-void CreateCommandPool(const DeviceInfo& deviceInfo, VkQueueFlagBits family, CommandInfo& commandInfo)
+void CreateCommandPool(DeviceInfo& deviceInfo, VkQueueFlagBits family, CommandInfo& commandInfo)
 {
     VkCommandPoolCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -795,7 +862,7 @@ void CreateCommandPool(const DeviceInfo& deviceInfo, VkQueueFlagBits family, Com
     }
 }
 
-void CreateVertexBuffer(vector<VertexV1>& vertices, BufferInfo& bufferInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo)
+void CreateVertexBuffer(const vector<VertexV1>& vertices, BufferInfo& bufferInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo)
 {
     VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
@@ -821,7 +888,7 @@ void CreateVertexBuffer(vector<VertexV1>& vertices, BufferInfo& bufferInfo, Devi
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
-void CreateIndexBuffer(vector<uint16_t>& indices, BufferInfo& bufferInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo)
+void CreateIndexBuffer(const vector<uint16_t>& indices, BufferInfo& bufferInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo)
 {
     VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
 
@@ -846,7 +913,119 @@ void CreateIndexBuffer(vector<uint16_t>& indices, BufferInfo& bufferInfo, Device
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
-void CreateBuffer(DeviceInfo &deviceInfo, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags preferredProperties, VkBuffer &buffer, VkDeviceMemory &bufferMemory)
+void CreateUniformBuffer(VkBuffer& vpBuffer, VkDeviceMemory& vpBufferMemory, SwapchainInfo& swapchainInfo, DeviceInfo& deviceInfo)
+{
+    VkDeviceSize bufferSize = sizeof(VP);
+
+    CreateBuffer(deviceInfo, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, vpBuffer, vpBufferMemory);
+
+    VkPhysicalDeviceProperties physicalDeviceProperties;
+    vkGetPhysicalDeviceProperties(deviceInfo.physicalDevice, &physicalDeviceProperties);
+    VkDeviceSize minUboAlignment = physicalDeviceProperties.limits.minUniformBufferOffsetAlignment;
+    dynamicAlignment = sizeof(MDynamic);
+    if (minUboAlignment > 0) {
+        dynamicAlignment = (dynamicAlignment + minUboAlignment - 1) / minUboAlignment * minUboAlignment;
+    }
+    bufferSize = dynamicAlignment * 3;
+    DebugLog("minUniformBufferOffsetAlignment: %d\n", minUboAlignment);
+    DebugLog("dynamicAlignment: %d\n", dynamicAlignment);
+    VkMemoryRequirements memReq = CreateBuffer(deviceInfo, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, dynamicMBuff, dynamicMMem);
+    DebugLog("VkMemoryRequirements size: %d\n", memReq.size);
+    VkResult result = vkMapMemory(deviceInfo.logicalDevices[0], dynamicMMem, 0, memReq.size, 0, (void **)&dynamicM);
+    if (result != VK_SUCCESS) {
+        string code = to_string(result);
+        throw runtime_error("vkMapMemory: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
+    }
+}
+
+void CreateDescriptorPool(VkDescriptorPool& descriptorPool, DeviceInfo& deviceInfo)
+{
+    VkDescriptorPoolSize poolSizes[] = { {}, {} };
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = 1;
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    poolSizes[1].descriptorCount = 1;
+
+    VkDescriptorPoolCreateInfo poolInfo = {};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 2;
+    poolInfo.pPoolSizes = poolSizes;
+    poolInfo.maxSets = 1;
+
+    VkDevice device = deviceInfo.logicalDevices[0];
+    VkResult result = vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool);
+    if (result != VK_SUCCESS) {
+        string code = to_string(result);
+        throw runtime_error("vkCreateDescriptorPool: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
+    }
+}
+
+void CreateDescriptorSets(ResourceDescriptor& mvpDescriptor, VkBuffer& vpBuffer, VkDeviceMemory& vpBufferMemory, SwapchainInfo& swapchainInfo, DeviceInfo& deviceInfo)
+{
+    VkDescriptorSetAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = mvpDescriptor.pool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &mvpDescriptor.layout;
+    VkDevice device = deviceInfo.logicalDevices[0];
+    VkResult result = vkAllocateDescriptorSets(device, &allocInfo, &mvpDescriptor.set);
+    if (result != VK_SUCCESS) {
+        string code = to_string(result);
+        throw runtime_error("vkAllocateDescriptorSets: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
+    }
+
+    VkDescriptorBufferInfo vpBufferInfo = {};
+    vpBufferInfo.buffer = vpBuffer;
+    vpBufferInfo.offset = 0;
+    vpBufferInfo.range = VK_WHOLE_SIZE;
+
+    VkDescriptorBufferInfo dynamicMBufferInfo = {};
+    dynamicMBufferInfo.buffer = dynamicMBuff;
+    dynamicMBufferInfo.offset = 0;
+    dynamicMBufferInfo.range = VK_WHOLE_SIZE;
+
+    VkWriteDescriptorSet descriptorWrites[] = { {}, {} };
+    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[0].dstSet = mvpDescriptor.set;
+    descriptorWrites[0].dstBinding = 0;
+    descriptorWrites[0].dstArrayElement = 0;
+    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[0].descriptorCount = 1;
+    descriptorWrites[0].pBufferInfo = &vpBufferInfo;
+    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[1].dstSet = mvpDescriptor.set;
+    descriptorWrites[1].dstBinding = 1;
+    descriptorWrites[1].dstArrayElement = 0;
+    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    descriptorWrites[1].descriptorCount = 1;
+    descriptorWrites[1].pBufferInfo = &dynamicMBufferInfo;
+    vkUpdateDescriptorSets(device, 2, descriptorWrites, 0, nullptr);
+
+    UpdateMVP(vpBufferMemory, swapchainInfo, deviceInfo);
+}
+
+void UpdateMVP(VkDeviceMemory& vpMemory, SwapchainInfo& swapchainInfo, DeviceInfo& deviceInfo)
+{
+    VP vp = {};
+    vp.view = lookAt(vec3(0.0f, 0.4330127f, 4.0f), vec3(0.0f, 0.4330127f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    vp.projection = perspective(radians(60.0f), swapchainInfo.extent.width / (float) swapchainInfo.extent.height, 0.1f, 32.0f);
+    vp.projection[1][1] *= -1;
+
+    VkDevice device = deviceInfo.logicalDevices[0];
+    void* data;
+    vkMapMemory(device, vpMemory, 0, sizeof(vp), 0, &data);
+    memcpy(data, &vp, sizeof(vp));
+    vkUnmapMemory(device, vpMemory);
+
+    MDynamic* base = dynamicM;
+    base->model = translate(mat4(1.0f), vec3(0.0f, 0.8660254f, 0.0f));
+    base += 1;
+    base->model = translate(mat4(1.0f), vec3(-0.5f, 0.0f, 0.0f));
+    base += 1;
+    base->model = translate(mat4(1.0f), vec3(0.5f, 0.0f, 0.0f));
+}
+
+VkMemoryRequirements CreateBuffer(DeviceInfo &deviceInfo, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags preferredProperties, VkBuffer &buffer, VkDeviceMemory &bufferMemory)
 {
     VkBufferCreateInfo bufferInfo = {};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -875,7 +1054,13 @@ void CreateBuffer(DeviceInfo &deviceInfo, VkDeviceSize size, VkBufferUsageFlags 
         throw runtime_error("vkAllocateMemory: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
     }
 
-    vkBindBufferMemory(device, buffer, bufferMemory, 0);
+    result = vkBindBufferMemory(device, buffer, bufferMemory, 0);
+    if (result != VK_SUCCESS) {
+        string code = to_string(result);
+        throw runtime_error("vkBindBufferMemory: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
+    }
+
+    return memRequirements;
 }
 
 bool MapMemoryTypeToIndex(VkPhysicalDevice& physicalDevice, uint32_t memoryRequirements, VkMemoryPropertyFlags preferredProperties, uint32_t& memoryIndex)
@@ -941,7 +1126,7 @@ void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, Devic
     vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
 }
 
-void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, const DeviceInfo& deviceInfo, CommandInfo& commandInfo, const VkRenderPass& renderPass, const PipelineInfo& pipelineInfo, const BufferInfo& bufferInfo, const vector<uint16_t>& indices)
+void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, DeviceInfo& deviceInfo, CommandInfo& commandInfo, VkRenderPass& renderPass, PipelineInfo& pipelineInfo, BufferInfo& bufferInfo, const vector<uint16_t>& indices, VkDescriptorSet& descriptorSet)
 {
     uint32_t size = swapchainInfo.images.size();
     commandInfo.buffer.resize(size);
@@ -963,7 +1148,7 @@ void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, 
     clearColor.color.float32[3] = 1.0f;
     VkCommandBufferBeginInfo beginInfo = {};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     for (uint32_t i = 0; i < size; i++) {
         result = vkBeginCommandBuffer(commandInfo.buffer[i], &beginInfo);
         if (result != VK_SUCCESS) {
@@ -979,11 +1164,6 @@ void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, 
         renderPassBeginInfo.renderArea.offset = { 0, 0 };
         renderPassBeginInfo.renderArea.extent = swapchainInfo.extent;
         renderPassBeginInfo.clearValueCount = 1;
-//        VkClearValue clearColor;
-//        clearColor.color.float32[0] =  (float)i * 0.125f;
-//        clearColor.color.float32[1] = (float)i * 0.25f;
-//        clearColor.color.float32[2] = (float)i * 0.15625f;
-//        clearColor.color.float32[3] = 1.0f;
         renderPassBeginInfo.pClearValues = &clearColor;
 
         vkCmdBeginRenderPass(commandInfo.buffer[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
@@ -994,7 +1174,16 @@ void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, 
         VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(commandInfo.buffer[i], 0, 1, vertexBuffers, offsets);
         vkCmdBindIndexBuffer(commandInfo.buffer[i], bufferInfo.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+        uint32_t dynamicOffsets = 0;
+        vkCmdBindDescriptorSets(commandInfo.buffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineInfo.layout, 0, 1, &descriptorSet, 1, &dynamicOffsets);
+        vkCmdDrawIndexed(commandInfo.buffer[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
+        dynamicOffsets += dynamicAlignment;
+        vkCmdBindDescriptorSets(commandInfo.buffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineInfo.layout, 0, 1, &descriptorSet, 1, &dynamicOffsets);
+        vkCmdDrawIndexed(commandInfo.buffer[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+
+        dynamicOffsets += dynamicAlignment;
+        vkCmdBindDescriptorSets(commandInfo.buffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineInfo.layout, 0, 1, &descriptorSet, 1, &dynamicOffsets);
         vkCmdDrawIndexed(commandInfo.buffer[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
         vkCmdEndRenderPass(commandInfo.buffer[i]);
@@ -1007,7 +1196,7 @@ void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, 
     }
 }
 
-void CreateSharedGraphicsAndPresentSyncPrimitives(const DeviceInfo& deviceInfo, DrawSyncPrimitives& primitives)
+void CreateSharedGraphicsAndPresentSyncPrimitives(DeviceInfo& deviceInfo, DrawSyncPrimitives& primitives)
 {
     primitives.imageAvailableSemaphores.resize(primitives.concurrentFrameCount);
     primitives.renderFinishedSemaphores.resize(primitives.concurrentFrameCount);
@@ -1037,23 +1226,24 @@ void CreateSharedGraphicsAndPresentSyncPrimitives(const DeviceInfo& deviceInfo, 
     }
 }
 
-VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, vector<DrawSyncPrimitives>& primitives, const BufferInfo& bufferInfo, const vector<uint16_t>& indices)
+VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, vector<DrawSyncPrimitives>& primitives, BufferInfo& bufferInfo, const vector<uint16_t>& indices, VkBuffer& vpBuffer, VkDeviceMemory& vpBufferMemory, ResourceDescriptor& mvpDescriptor)
 {
     DeviceInfo& deviceInfo = instanceInfo.devices[0];
     VkDevice device = deviceInfo.logicalDevices[0];
     if (deviceInfo.sharedGraphicsAndPresentQueue) {
         DrawSyncPrimitives sharedPrimitive = primitives[0];
         vkWaitForFences(device, 1, &sharedPrimitive.inFlightFences[sharedPrimitive.currentFrame], VK_TRUE, numeric_limits<uint64_t>::max());
+        vkResetFences(device, 1, &sharedPrimitive.inFlightFences[sharedPrimitive.currentFrame]);
 
         uint32_t imageIndex;
         VkResult result = vkAcquireNextImageKHR(device, swapchainInfo.swapchain, numeric_limits<uint64_t>::max(), sharedPrimitive.imageAvailableSemaphores[sharedPrimitive.currentFrame], VK_NULL_HANDLE, &imageIndex);
-        if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-            RecreateSwapchain(app, instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo, bufferInfo, indices);
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || instanceInfo.resolutionChanged) {
+            RecreateSwapchain(app, instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo, bufferInfo, indices, mvpDescriptor, vpBuffer, vpBufferMemory);
+            instanceInfo.resolutionChanged = false;
+            return VK_SUCCESS;
         } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
             return result;
         }
-
-        vkResetFences(device, 1, &sharedPrimitive.inFlightFences[sharedPrimitive.currentFrame]);
 
         VkSubmitInfo submitInfo = {};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1089,8 +1279,9 @@ VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& 
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || instanceInfo.resolutionChanged) {
             string code = to_string(result);
             DebugLog("vkQueuePresentKHR: code[%d], file[%s], line[%d]", result, __FILE__, __LINE__);
+            RecreateSwapchain(app, instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo, bufferInfo, indices, mvpDescriptor, vpBuffer, vpBufferMemory);
             instanceInfo.resolutionChanged = false;
-            RecreateSwapchain(app, instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo, bufferInfo, indices);
+            return VK_SUCCESS;
         } else if (result != VK_SUCCESS) {
             string code = to_string(result);
             throw runtime_error("vkQueuePresentKHR: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
@@ -1103,14 +1294,25 @@ VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& 
     return VK_SUCCESS;
 }
 
-void DeleteVulkan(InstanceInfo& instanceInfo, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, vector<DrawSyncPrimitives>& primitives, BufferInfo& bufferInfo)
+void DeleteVulkan(InstanceInfo& instanceInfo, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, vector<DrawSyncPrimitives>& primitives, BufferInfo& bufferInfo, VkBuffer& vpBuffer, VkDeviceMemory& vpBufferMemory, ResourceDescriptor& mvpDescriptor)
 {
     DeviceInfo deviceInfo = instanceInfo.devices[0];
     VkDevice device = deviceInfo.logicalDevices[0];
 
     //////////////////////////////
-    DeleteRenderData(instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo);
+    DeleteRenderData(instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo, vpBuffer, vpBufferMemory, mvpDescriptor);
     ////////////////////////////////
+
+    vkDestroyPipelineLayout(device, pipelineInfo.layout, nullptr);
+
+    vkDestroyDescriptorSetLayout(device, mvpDescriptor.layout, nullptr);
+    vkDestroyDescriptorPool(device, mvpDescriptor.pool, nullptr);
+
+    vkDestroyBuffer(device, vpBuffer, nullptr);
+    vkFreeMemory(device, vpBufferMemory, nullptr);
+    vkUnmapMemory(device, dynamicMMem);
+    vkDestroyBuffer(device, dynamicMBuff, nullptr);
+    vkFreeMemory(device, dynamicMMem, nullptr);
 
     vkDestroyBuffer(device, bufferInfo.indexBuffer, nullptr);
     vkFreeMemory(device, bufferInfo.indexBufferMemory, nullptr);
@@ -1149,7 +1351,7 @@ void DeleteVulkan(InstanceInfo& instanceInfo, set<VkCommandPool>& commandPools, 
     instanceInfo.initialized = false;
 }
 
-void DeleteRenderData(const InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo)
+void DeleteRenderData(InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, VkBuffer& vpBuffer, VkDeviceMemory& vpBufferMemory, ResourceDescriptor& mvpDescriptor)
 {
     DeviceInfo deviceInfo = instanceInfo.devices[0];
     VkDevice device = deviceInfo.logicalDevices[0];
@@ -1164,12 +1366,11 @@ void DeleteRenderData(const InstanceInfo& instanceInfo, vector<CommandInfo>& com
     }
 
     vkDestroyPipeline(device, pipelineInfo.pipeline, nullptr);
-    vkDestroyPipelineLayout(device, pipelineInfo.layout, nullptr);
     vkDestroyRenderPass(device, renderPass, nullptr);
     DeleteSwapchain(deviceInfo, swapchainInfo);
 }
 
-void DeleteSwapchain(const DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo)
+void DeleteSwapchain(DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo)
 {
     size_t size = swapchainInfo.framebuffers.size();
     VkDevice device = deviceInfo.logicalDevices[0];
