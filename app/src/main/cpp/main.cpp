@@ -106,7 +106,7 @@ status OnStep(android_app* app)
 {
     //DebugLog("App OnStep");
 
-    VkResult result = DrawFrame(app, instanceInfo, swapchainInfo, renderPass, commandInfos, pipelineInfo, drawSyncPrimitives, bufferInfo, indices, uniformBuffersMemory, transformDescriptor);
+    VkResult result = DrawFrame(app, instanceInfo, swapchainInfo, renderPass, commandInfos, pipelineInfo, drawSyncPrimitives, bufferInfo, indices, uniformBuffersMemory, uniformBuffers, textureObject, transformDescriptor);
     if (result == VK_SUCCESS) {
         return OK;
     } else {

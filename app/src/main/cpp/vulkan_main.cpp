@@ -158,7 +158,7 @@ void CreateMultiviewCommandBuffers(const BufferInfo& bufferInfo, const vector<ui
 void CreateMultiviewSyncs(DrawSyncPrimitives& synPrimitive, DeviceInfo& deviceInfo);
 
 void DeleteSwapchain(const DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo);
-void DeleteRenderData(const InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo);
+void DeleteRenderData(const InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, vector<ResourceDescriptor>& resourceDescriptor);
 
 bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, vector<DrawSyncPrimitives>& primitives, vector<VertexV1>& vertices, vector<uint32_t>& indices, BufferInfo& bufferInfo, PipelineInfo& pipelineInfo, vector<VkBuffer>& uniformBuffers, vector<VkDeviceMemory>& uniformBuffersMemory, vector<ResourceDescriptor>& resourceDescriptor, set<VkDescriptorPool>& descriptorPools, TextureOject& textureObject)
 {
@@ -680,9 +680,9 @@ void CreateSwapChain(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainI
     }
 }
 
-void RecreateSwapchain(android_app* app, InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, const BufferInfo& bufferInfo, const vector<uint32_t>& indices, vector<ResourceDescriptor>& resourceDescriptor)
+void RecreateSwapchain(android_app* app, InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, const BufferInfo& bufferInfo, const vector<uint32_t>& indices, vector<VkBuffer>& uniformBuffers, TextureOject& textureObject, vector<ResourceDescriptor>& resourceDescriptor)
 {
-    DeleteRenderData(instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo);
+    DeleteRenderData(instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo, resourceDescriptor);
     CreateSwapChain(instanceInfo, swapchainInfo);
     CreateImageViews(instanceInfo, swapchainInfo);
     CreateRenderPass(instanceInfo, swapchainInfo, renderPass);
@@ -690,14 +690,16 @@ void RecreateSwapchain(android_app* app, InstanceInfo& instanceInfo, vector<Comm
     CreateSampleImage(swapchainInfo, instanceInfo.devices[0], commandInfos[1]);
     CreateDepthBuffer(swapchainInfo, instanceInfo.devices[0], commandInfos[1]);
     CreateFrameBuffers(instanceInfo, swapchainInfo, renderPass);
-    CreateSharedGraphicsAndPresentCommandBuffers(swapchainInfo, instanceInfo.devices[0], commandInfos[0], renderPass, pipelineInfo, bufferInfo, indices, resourceDescriptor);
 
     CreateMultiviewColor(swapchainInfo, commandInfos[1], instanceInfo.devices[0]);
     VkFormat depthFormat;
     CreateMultiviewDepth(depthFormat, swapchainInfo, instanceInfo.devices[0]);
-    CreateMultiViewRenderPass(swapchainInfo.format, depthFormat, instanceInfo.devices[0]);
-    CreateMultiViewPipeline(pipelineInfo.layout, instanceInfo.devices[0], app);
+    //CreateMultiViewRenderPass(swapchainInfo.format, depthFormat, instanceInfo.devices[0]);
+    //CreateMultiViewPipeline(pipelineInfo.layout, instanceInfo.devices[0], app);
     CreateMultiviewFramebuffer(swapchainInfo, instanceInfo.devices[0]);
+    CreateDescriptorSets(resourceDescriptor, uniformBuffers, textureObject, instanceInfo.devices[0], swapchainInfo);
+    CreateSharedGraphicsAndPresentCommandBuffers(swapchainInfo, instanceInfo.devices[0], commandInfos[0], renderPass, pipelineInfo, bufferInfo, indices, resourceDescriptor);
+
     CreateMultiviewCommandBuffers(bufferInfo, indices, commandInfos[0].pool, swapchainInfo, pipelineInfo.layout, resourceDescriptor, instanceInfo.devices[0]);
 }
 
@@ -1698,7 +1700,7 @@ void CreateSharedGraphicsAndPresentSyncPrimitives(const DeviceInfo& deviceInfo, 
     }
 }
 
-VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, vector<DrawSyncPrimitives>& primitives, const BufferInfo& bufferInfo, const vector<uint32_t>& indices, vector<VkDeviceMemory>& mvpMemory, vector<ResourceDescriptor>& resourceDescriptor)
+VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, vector<DrawSyncPrimitives>& primitives, const BufferInfo& bufferInfo, const vector<uint32_t>& indices, vector<VkDeviceMemory>& mvpMemory, vector<VkBuffer>& uniformBuffers, TextureOject& textureOject, vector<ResourceDescriptor>& resourceDescriptor)
 {
     DeviceInfo& deviceInfo = instanceInfo.devices[0];
     VkDevice device = deviceInfo.logicalDevices[0];
@@ -1713,7 +1715,7 @@ VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& 
         uint32_t imageIndex;
         VkResult result = vkAcquireNextImageKHR(device, swapchainInfo.swapchain, UINT64_MAX, sharedPrimitive.imageAvailableSemaphores[sharedPrimitive.currentFrame], VK_NULL_HANDLE, &imageIndex);
         if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-            RecreateSwapchain(app, instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo, bufferInfo, indices, resourceDescriptor);
+            RecreateSwapchain(app, instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo, bufferInfo, indices, uniformBuffers, textureOject, resourceDescriptor);
         } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
             return result;
         }
@@ -1765,7 +1767,7 @@ VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& 
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || instanceInfo.resolutionChanged) {
             string code = to_string(result);
             DebugLog("vkQueuePresentKHR: code[%d], file[%s], line[%d]", result, __FILE__, __LINE__);
-            RecreateSwapchain(app, instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo, bufferInfo, indices, resourceDescriptor);
+            RecreateSwapchain(app, instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo, bufferInfo, indices, uniformBuffers, textureOject, resourceDescriptor);
             instanceInfo.resolutionChanged = false;
         } else if (result != VK_SUCCESS) {
             string code = to_string(result);
@@ -1843,7 +1845,7 @@ void DeleteVulkan(InstanceInfo& instanceInfo, set<VkCommandPool>& commandPools, 
     VkDevice device = deviceInfo.logicalDevices[0];
 
     //////////////////////////////
-    DeleteRenderData(instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo);
+    DeleteRenderData(instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo, resourceDescriptor);
     ////////////////////////////////
 
     vkDestroySampler(device, textureOject.sampler, nullptr);
@@ -1906,12 +1908,39 @@ void DeleteVulkan(InstanceInfo& instanceInfo, set<VkCommandPool>& commandPools, 
     instanceInfo.initialized = false;
 }
 
-void DeleteRenderData(const InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo)
+void DeleteRenderData(const InstanceInfo& instanceInfo, vector<CommandInfo>& commandInfos, PipelineInfo& pipelineInfo, VkRenderPass& renderPass, SwapchainInfo& swapchainInfo, vector<ResourceDescriptor>& resourceDescriptor)
 {
     DeviceInfo deviceInfo = instanceInfo.devices[0];
     VkDevice device = deviceInfo.logicalDevices[0];
 
     vkDeviceWaitIdle(device);
+
+    for (auto& descriptorInfo : resourceDescriptor) {
+        vkFreeDescriptorSets(device, resourceDescriptor[0].pool, descriptorInfo.sets.size(), descriptorInfo.sets.data());
+    }
+
+    vkDestroyImageView(device, swapchainInfo.msaa.view, nullptr);
+    vkFreeMemory(device, swapchainInfo.msaa.memory, nullptr);
+    vkDestroyImage(device, swapchainInfo.msaa.image, nullptr);
+
+    vkDestroySampler(device, multiviewPass.sampler, nullptr);
+
+    size_t size = swapchainInfo.images.size();
+    for (int eye = 0; eye < 2; eye++) {
+        for (int i = 0; i < size; i++) {
+            vkDestroyFramebuffer(device, multiviewPass.frameBuffer[eye][i], nullptr);
+
+            vkDestroyImageView(device, multiviewPass.color[eye].view[i], nullptr);
+            vkFreeMemory(device, multiviewPass.color[eye].memory[i], nullptr);
+            vkDestroyImage(device, multiviewPass.color[eye].image[i], nullptr);
+
+            vkDestroyImageView(device, multiviewPass.depth[eye].view[i], nullptr);
+            vkFreeMemory(device, multiviewPass.depth[eye].memory[i], nullptr);
+            vkDestroyImage(device, multiviewPass.depth[eye].image[i], nullptr);
+        }
+    }
+
+    vkFreeCommandBuffers(device, commandInfos[0].pool, multiviewPass.commandBuffers.size(), multiviewPass.commandBuffers.data());
 
     for (auto& cmd : commandInfos) {
         if (cmd.buffer.size() == 0) {
@@ -1924,8 +1953,6 @@ void DeleteRenderData(const InstanceInfo& instanceInfo, vector<CommandInfo>& com
     //vkDestroyPipelineLayout(device, pipelineInfo.layout, nullptr);
     vkDestroyRenderPass(device, renderPass, nullptr);
     DeleteSwapchain(deviceInfo, swapchainInfo);
-
-
 }
 
 void DeleteSwapchain(const DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo)
@@ -1944,21 +1971,21 @@ void DeleteSwapchain(const DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo)
     vkDestroyImage(device, swapchainInfo.depthImageInfo[0].image, nullptr);
     vkFreeMemory(device, swapchainInfo.depthImageInfo[0].memory, nullptr);
 
-    vkDestroyImageView(device, swapchainInfo.msaa.view, nullptr);
-    vkDestroyImage(device, swapchainInfo.msaa.image, nullptr);
-    vkFreeMemory(device, swapchainInfo.msaa.memory, nullptr);
+//    vkDestroyImageView(device, swapchainInfo.msaa.view, nullptr);
+//    vkDestroyImage(device, swapchainInfo.msaa.image, nullptr);
+//    vkFreeMemory(device, swapchainInfo.msaa.memory, nullptr);
 
-    for (int eye = 0; eye < 2; eye++) {
-        for (int i = 0; i < multiviewPass.color[eye].image.size(); i++) {
-            vkDestroyFramebuffer(device, multiviewPass.frameBuffer[eye][i], nullptr);
-            vkDestroyImage(device, multiviewPass.color[eye].image[i], nullptr);
-            vkDestroyImageView(device, multiviewPass.color[eye].view[i], nullptr);
-            vkFreeMemory(device, multiviewPass.color[eye].memory[i], nullptr);
-            vkDestroyImage(device, multiviewPass.depth[eye].image[i], nullptr);
-            vkDestroyImageView(device, multiviewPass.depth[eye].view[i], nullptr);
-            vkFreeMemory(device, multiviewPass.depth[eye].memory[i], nullptr);
-        }
-    }
+//    for (int eye = 0; eye < 2; eye++) {
+//        for (int i = 0; i < multiviewPass.color[eye].image.size(); i++) {
+//            vkDestroyFramebuffer(device, multiviewPass.frameBuffer[eye][i], nullptr);
+//            vkDestroyImage(device, multiviewPass.color[eye].image[i], nullptr);
+//            vkDestroyImageView(device, multiviewPass.color[eye].view[i], nullptr);
+//            vkFreeMemory(device, multiviewPass.color[eye].memory[i], nullptr);
+//            vkDestroyImage(device, multiviewPass.depth[eye].image[i], nullptr);
+//            vkDestroyImageView(device, multiviewPass.depth[eye].view[i], nullptr);
+//            vkFreeMemory(device, multiviewPass.depth[eye].memory[i], nullptr);
+//        }
+//    }
 
     vkDestroySwapchainKHR(device, swapchainInfo.swapchain, nullptr);
 }
