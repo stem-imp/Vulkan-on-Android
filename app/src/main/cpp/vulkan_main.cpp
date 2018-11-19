@@ -118,7 +118,7 @@ void CreateSwapChain(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainI
 void CreateImageViews(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo);
 VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectMask, uint32_t  mipmapLevel, VkDevice device);
 void CreateRenderPass(const InstanceInfo& instanceInfo, const SwapchainInfo& swapchainInfo, VkRenderPass& renderPass);
-void CreateDescriptorSetLayout(VkDescriptorSetLayout& descriptorSetLayout, DeviceInfo& deviceInfo);
+void CreateDescriptorSetLayout(VkDescriptorSetLayout& descriptorSetLayout, VkPipelineLayout& pipelineLayout, DeviceInfo& deviceInfo);
 void CreateGraphicsPipeline(PipelineInfo& pipelineInfo, android_app* app, const DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, VkDescriptorSetLayout& descriptorSetLayout);
 void CreateFrameBuffers(const InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass renderPass);
 void CreateCommandPool(const DeviceInfo& deviceInfo, VkQueueFlagBits family, CommandInfo& commandInfo);
@@ -227,7 +227,7 @@ bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swa
     resourceDescriptor[0].layouts.clear();
     resourceDescriptor[0].layouts.push_back(VkDescriptorSetLayout{});
     VkDescriptorSetLayout& descriptorSetLayout = resourceDescriptor[0].layouts[0];
-    CreateDescriptorSetLayout(descriptorSetLayout, instanceInfo.devices[0]);
+    CreateDescriptorSetLayout(descriptorSetLayout, pipelineInfo.layout, instanceInfo.devices[0]);
     CreateGraphicsPipeline(pipelineInfo, app, instanceInfo.devices[0], swapchainInfo, renderPass, descriptorSetLayout);
 
     vertices.clear();
@@ -943,18 +943,6 @@ void CreateGraphicsPipeline(PipelineInfo& pipelineInfo, android_app* app, const 
     dynamicState.dynamicStateCount = 2;
     dynamicState.pDynamicStates = dynamicStateEnables;
 
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
-    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
-    pipelineLayoutInfo.pushConstantRangeCount = 0;
-    VkDevice device = deviceInfo.logicalDevices[0];
-    VkResult result = vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineInfo.layout);
-    if (result != VK_SUCCESS) {
-        string code = to_string(result);
-        throw runtime_error("vkCreatePipelineLayout: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
-    }
-
     VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
     pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipelineCreateInfo.stageCount = 2;
@@ -973,7 +961,8 @@ void CreateGraphicsPipeline(PipelineInfo& pipelineInfo, android_app* app, const 
     pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineCreateInfo.basePipelineIndex = -1;
 
-    result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipelineInfo.pipeline);
+    VkDevice device = deviceInfo.logicalDevices[0];
+    VkResult result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipelineInfo.pipeline);
     if (result != VK_SUCCESS) {
         string code = to_string(result);
         throw runtime_error("vkCreateGraphicsPipelines: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
@@ -1863,6 +1852,8 @@ void DeleteVulkan(InstanceInfo& instanceInfo, set<VkCommandPool>& commandPools, 
     vkDestroyImage(device, textureOject.imageInfo.image, nullptr);
     vkFreeMemory(device, textureOject.imageInfo.memory, nullptr);
 
+    vkDestroyPipelineLayout(device, pipelineInfo.layout, nullptr);
+
     for (auto& l : resourceDescriptor[0].layouts) {
         vkDestroyDescriptorSetLayout(device, l, nullptr);
     }
@@ -1930,9 +1921,11 @@ void DeleteRenderData(const InstanceInfo& instanceInfo, vector<CommandInfo>& com
     }
 
     vkDestroyPipeline(device, pipelineInfo.pipeline, nullptr);
-    vkDestroyPipelineLayout(device, pipelineInfo.layout, nullptr);
+    //vkDestroyPipelineLayout(device, pipelineInfo.layout, nullptr);
     vkDestroyRenderPass(device, renderPass, nullptr);
     DeleteSwapchain(deviceInfo, swapchainInfo);
+
+
 }
 
 void DeleteSwapchain(const DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo)
@@ -1970,7 +1963,7 @@ void DeleteSwapchain(const DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo)
     vkDestroySwapchainKHR(device, swapchainInfo.swapchain, nullptr);
 }
 
-void CreateDescriptorSetLayout(VkDescriptorSetLayout& descriptorSetLayout, DeviceInfo& deviceInfo)
+void CreateDescriptorSetLayout(VkDescriptorSetLayout& descriptorSetLayout, VkPipelineLayout& pipelineLayout, DeviceInfo& deviceInfo)
 {
     VkDescriptorSetLayoutBinding uboBinding = {};
     uboBinding.binding = 0;
@@ -2011,6 +2004,17 @@ void CreateDescriptorSetLayout(VkDescriptorSetLayout& descriptorSetLayout, Devic
     if (result != VK_SUCCESS) {
         string code = to_string(result);
         throw runtime_error("vkCreateDescriptorSetLayout: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
+    }
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+    pipelineLayoutInfo.pushConstantRangeCount = 0;
+    result = vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout);
+    if (result != VK_SUCCESS) {
+        string code = to_string(result);
+        throw runtime_error("vkCreatePipelineLayout: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
     }
 }
 
