@@ -4,6 +4,7 @@
 #include "types.hpp"
 #include <android_native_app_glue.h>
 #include <functional>
+#include <android/sensor.h>
 
 using std::function;
 
@@ -32,6 +33,10 @@ namespace AndroidNative {
 
         function<void(android_app *)> onConfigurationChanged;
         function<void(void)> onLowMemory;
+
+        function<void(float rotationVector[])> onGetRotationVector;
+
+        ASensorEventQueue* accelerometerEventQueue;
     private:
         void Activate();
         void Deactivate();
@@ -41,6 +46,9 @@ namespace AndroidNative {
         android_app *_application;
         bool _enabled;
         bool _quit;
+
+        ASensorManager* sensorManager;
+        const ASensor* accelerometer;
     };
 }
 

@@ -177,6 +177,8 @@ typedef struct TextureObject {
     VkSamplerMipmapMode mipmapMode;
 } TextureOject;
 
+void UpdateDeviceOrientation(const float rotationMatrix[], bool columnMajorInput = true);
+
 // Initialize vulkan device context
 // after return, vulkan is ready to draw
 bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass, set<VkCommandPool>& commandPools, vector<CommandInfo>& commandInfos, vector<DrawSyncPrimitives>& primitives, vector<VertexV1>& vertices, vector<uint32_t>& indices, BufferInfo& bufferInfo, PipelineInfo& pipelineInfo, vector<VkBuffer>& uniformBuffers, vector<VkDeviceMemory>& uniformBuffersMemory, vector<ResourceDescriptor>& transformDescriptor, set<VkDescriptorPool>& descriptorPools, TextureOject& textureObject);

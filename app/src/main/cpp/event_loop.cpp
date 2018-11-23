@@ -10,6 +10,16 @@ EventLoop::EventLoop(android_app* app):
 {
     _application->userData = this;
     _application->onAppCmd = AppEvent;
+
+    sensorManager = ASensorManager_getInstance();
+    accelerometer = ASensorManager_getDefaultSensor(sensorManager, ASENSOR_TYPE_ROTATION_VECTOR);
+    accelerometerEventQueue = ASensorManager_createEventQueue(sensorManager, app->looper, LOOPER_ID_MAIN, nullptr, nullptr);
+    int minRate = ASensor_getMinDelay(accelerometer);
+    DebugLog("sensor sample rate: %d\n", minRate);
+    auto status = ASensorEventQueue_setEventRate(accelerometerEventQueue, accelerometer, 8333);
+    assert(status >= 0);
+    status = ASensorEventQueue_enableSensor(accelerometerEventQueue, accelerometer);
+    assert(status >= 0);
 }
 
 void EventLoop::Run()
@@ -22,6 +32,13 @@ void EventLoop::Run()
     Log::Info("Starting event loop");
     while (true) {
         while (ALooper_pollAll(_enabled ? 0 : -1, nullptr, &events, (void**)&source) >= 0) {
+            ASensorEvent event;
+            if (ASensorEventQueue_getEvents(accelerometerEventQueue, &event, 1) > 0) {
+                if (event.type == ASENSOR_TYPE_ROTATION_VECTOR) {
+                    //AndroidNative::Log::DebugLog("rotation vector");
+                    onGetRotationVector(event.data);
+                }
+            }
             if (source != nullptr) {
                 source->process (_application, source);
             }

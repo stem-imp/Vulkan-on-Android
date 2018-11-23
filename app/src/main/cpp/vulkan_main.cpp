@@ -9,6 +9,8 @@
 #include <map>
 #include <unordered_map>
 #include <chrono>
+#include <ext.hpp>
+#include <algorithm>
 
 using AndroidNative::Log;
 
@@ -105,6 +107,8 @@ typedef struct VertexV2 {
         return attributeDescriptions;
     }
 } VertexV2;
+
+static vector<float> cameraRotationMatrix;
 
 void CreateInstance(InstanceInfo& instanceInfo, const LayerAndExtension& layerAndExtension);
 void CreateSurface(InstanceInfo& instanceInfo, ANativeWindow* nativeWindow);
@@ -2071,8 +2075,30 @@ void CreateUniformBuffers(vector<VkBuffer>& uniformBuffers, vector<VkDeviceMemor
     UpdateMVP(uniformBuffersMemory, 0, deviceInfo, swapchainInfo);
 }
 
+// Receive column major
+void UpdateDeviceOrientation(const float rotationMatrix[], bool columnMajorInput)
+{
+    cameraRotationMatrix.resize(16);
+    if (columnMajorInput) {
+//        for (int i = 0; i < 16; i++) {
+//            cameraRotationMatrix[i] = rotationMatrix[i];
+//        }
+        std::copy(rotationMatrix, rotationMatrix + 16, &cameraRotationMatrix[0]);
+    } else {
+        for (int i = 0; i < 4; i++) {
+            cameraRotationMatrix[i * 4] = rotationMatrix[i + 0];
+            cameraRotationMatrix[i * 4 + 1] = rotationMatrix[i + 4];
+            cameraRotationMatrix[i * 4 + 2] = rotationMatrix[i + 8];
+            cameraRotationMatrix[i * 4 + 3] = rotationMatrix[i + 12];
+        }
+    }
+}
+
 void UpdateMVP(vector<VkDeviceMemory>& mvpMemory, uint32_t currentImageIndex, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo)
 {
+    if (cameraRotationMatrix.size() == 0) {
+        return;
+    }
     /*static auto startTime = high_resolution_clock::now();
 
     auto currentTime = high_resolution_clock::now();
@@ -2108,10 +2134,37 @@ void UpdateMVP(vector<VkDeviceMemory>& mvpMemory, uint32_t currentImageIndex, De
     float top = wd2;
     float bottom = -wd2;
 
+    mat4 transform(0.0f, -1.0f, 0.0f, 0.0f,
+                   0.0f, 0.0f, 1.0f, 0.0f,
+                  - 1.0f, 0.0f, 0.0f, 0.0f,
+                   0.0f, 0.0f, 0.0f, 1.0f);
+
+    //if (cameraRotationMatrix.size() > 0) {
+        mat4 cameraRotation = glm::make_mat4(&cameraRotationMatrix[0]);
+        glm::quat q(0.7071068f, 0.0f, -0.7071068f, 0.0f);
+        mat4 qM = glm::mat4_cast(q);
+        glm::quat invQ = glm::inverse(q);
+        mat4 invQM = glm::mat4_cast(invQ);
+        //cameraRotation = cameraRotation * invQM;
+        //cameraRotation = transform * cameraRotation;
+            //glm::quat qScreen(glm::angleAxis(3.141592f/2.0f*2.0f, vec3(0.0f, 0.0f, 1.0f)));
+//        glm::quat qScreen(0.7071068f, 0.0f, 0.0f, 0.7071068f);
+//        mat4 qScreenM = glm::mat4_cast(qScreen);
+//        glm::quat invQScreen = glm::inverse(qScreen);
+//        mat4 invQScreenM = glm::mat4_cast(qScreen);
+        mat4 eye = glm::translate(mat4(1.0f), vec3(-0.5f * eyeSeparation, 0.0f, 3.0f));
+//        mat4 view0 = glm::transpose(cameraRotation * invQM) * glm::inverse(eye);
+//        mat4 i = glm::transpose(cameraRotation) * qM;
+        //mat4 view = glm::transpose(cameraRotation * invQM) * glm::inverse(eye);
+        //mat4 view = glm::transpose(cameraRotation) * glm::inverse(eye);
+    mat4 view = glm::transpose(cameraRotation) * glm::inverse(eye);
+    //}
+
     // Left eye
     left = -aspectRatio * wd2 + 0.5f * eyeSeparation * ndfl;
     right = aspectRatio * wd2 + 0.5f * eyeSeparation * ndfl;
-    base->view = lookAt(vec3(-0.5f * eyeSeparation, 0.0f, 3.0f), vec3(-0.5f * eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    //base->view = lookAt(vec3(-0.5f * eyeSeparation, 0.0f, 3.0f), vec3(-0.5f * eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    base->view = view;
     base->projection = glm::frustum(left, right, bottom, top, zNear, zFar);
     base->projection[1][1] *= -1;
 
@@ -2120,7 +2173,10 @@ void UpdateMVP(vector<VkDeviceMemory>& mvpMemory, uint32_t currentImageIndex, De
     // Right eye
     left = -aspectRatio * wd2 - 0.5f * eyeSeparation * ndfl;
     right = aspectRatio * wd2 - 0.5f * eyeSeparation * ndfl;
-    base->view = lookAt(vec3(0.5f * eyeSeparation, 0.0f, 3.0f), vec3(0.5f * eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    eye = glm::translate(mat4(1.0f), vec3(0.5f * eyeSeparation, 0.0f, 3.0f));
+    view = glm::transpose(cameraRotation) * glm::inverse(eye);
+    base->view = view;
+    //base->view = lookAt(vec3(0.5f * eyeSeparation, 0.0f, 3.0f), vec3(0.5f * eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
     base->projection = glm::frustum(left, right, bottom, top, zNear, zFar);
     base->projection[1][1] *= -1;
 
