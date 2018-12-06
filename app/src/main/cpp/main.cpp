@@ -198,20 +198,14 @@ void OnLowMemory(void)
 
 void OnGetRotationVector(float rotationVector[])
 {
-//    mat4 transform(0.0f, -1.0f, 0.0f, 0.0f,
-//                   0.0f, 0.0f, 1.0f, 0.0f,
-//                   - 1.0f, 0.0f, 0.0f, 0.0f,
-//                   0.0f, 0.0f, 0.0f, 1.0f);
     glm::quat q = glm::quat(rotationVector[3], rotationVector[0], rotationVector[1], rotationVector[2]);
     glm::quat n = glm::normalize(q);
-//    mat4 qM = glm::mat4_cast(n);
     glm::quat base(0.7071068f, 0.0f, -0.7071068f, 0.0f);
     n = n * glm::inverse(base);
     rotationVector[0] = -n.y;
     rotationVector[1] = n.z;
     rotationVector[2] = -n.x;
     rotationVector[3] = n.w;
-    glm::vec3 euler = glm::eulerAngles(n) * 180.0f / 3.141592f;
     GetRotationMatrixFromVector(rotationMatrix, 16, rotationVector, 4);
     UpdateDeviceOrientation(rotationMatrix, false);
 }

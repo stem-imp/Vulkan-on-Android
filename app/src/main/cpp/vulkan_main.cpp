@@ -70,7 +70,7 @@ struct MultiviewPass {
     VkSampler sampler;
     //vector<VkSemaphore> renderFinishedSemaphores;
     vector<VkCommandBuffer> commandBuffers;
-    vector<VkCommandBuffer> rightEyeCmdBuff;
+    //vector<VkCommandBuffer> rightEyeCmdBuff;
     //vector<VkFence> waitFences;
     VkPipeline pipeline;
 } multiviewPass;
@@ -147,12 +147,16 @@ void CreateUniformBuffers(vector<VkBuffer>& uniformBuffers, vector<VkDeviceMemor
 void CreateDescriptorPool(VkDescriptorPool& descriptorPool, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo);
 void CreateDescriptorSets(vector<ResourceDescriptor>& descriptor, vector<VkBuffer>& uniformBuffers, TextureObject& textureObject, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo);
 
-void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, const DeviceInfo& deviceInfo, CommandInfo& commandInfo, const VkRenderPass& renderPass, const PipelineInfo& pipelineInfo, const BufferInfo& bufferInfo, const vector<uint32_t>& indices, vector<ResourceDescriptor>& descriptors);
+void CreatePostProcessingCommandBuffers(SwapchainInfo &swapchainInfo, const DeviceInfo &deviceInfo,
+                                        CommandInfo &commandInfo, const VkRenderPass &renderPass,
+                                        const PipelineInfo &pipelineInfo,
+                                        const vector<uint32_t> &indices,
+                                        vector<ResourceDescriptor> &descriptors);
 void CreateSharedGraphicsAndPresentSyncPrimitives(const DeviceInfo& deviceInfo, DrawSyncPrimitives& primitives);
 
 void UpdateMVP(vector<VkDeviceMemory>& mvpMemory, uint32_t currentImageIndex, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo);
 
-void MultiviewSetup(SwapchainInfo& swapchainInfo, VkPipelineLayout& pipelineLayout, vector<VkDescriptorSet>& descriptorSets, vector<CommandInfo>& commandInfos, DrawSyncPrimitives& synPrimitive, DeviceInfo& deviceInfo, android_app* app);
+//void MultiviewSetup(SwapchainInfo& swapchainInfo, VkPipelineLayout& pipelineLayout, vector<VkDescriptorSet>& descriptorSets, vector<CommandInfo>& commandInfos, DrawSyncPrimitives& synPrimitive, DeviceInfo& deviceInfo, android_app* app);
 void CreateMultiviewColor(SwapchainInfo& swapchainInfo, CommandInfo& commandInfo, DeviceInfo& deviceInfo);
 void CreateMultiviewDepth(VkFormat& depthFormat, SwapchainInfo& swapchainInfo, DeviceInfo& deviceInfo);
 void CreateMultiViewRenderPass(const VkFormat& colorFormat, const VkFormat& depthFormat, DeviceInfo& deviceInfo);
@@ -237,6 +241,7 @@ bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swa
     vertices.clear();
     indices.clear();
     LoadModel((string(app->activity->externalDataPath) + string("/Traven.obj")).c_str(), vertices, indices, 0.0078125f);
+    //LoadModel((string(app->activity->externalDataPath) + string("/medival_house.obj")).c_str(), vertices, indices, 1.0f);
     CreateVertexBuffer(vertices, bufferInfo, instanceInfo.devices[0], commandInfos[1]);
     CreateIndexBuffer(indices, bufferInfo, instanceInfo.devices[0], commandInfos[1]);
     CreateUniformBuffers(uniformBuffers, uniformBuffersMemory, instanceInfo.devices[0], swapchainInfo);
@@ -256,7 +261,9 @@ bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swa
     CreateIntermediatePlaneData(swapchainInfo, instanceInfo.devices[0], commandInfos[1]);
 
     if (instanceInfo.devices[0].sharedGraphicsAndPresentQueue) {
-        CreateSharedGraphicsAndPresentCommandBuffers(swapchainInfo, instanceInfo.devices[0], commandInfos[0], renderPass, pipelineInfo, bufferInfo, indices, resourceDescriptor);
+        CreatePostProcessingCommandBuffers(swapchainInfo, instanceInfo.devices[0], commandInfos[0],
+                                           renderPass, pipelineInfo, indices,
+                                           resourceDescriptor);
         CreateMultiviewCommandBuffers(bufferInfo, indices, commandInfos[0].pool, swapchainInfo, pipelineInfo.layout, resourceDescriptor, instanceInfo.devices[0]);
         primitives.resize(2);
         for (auto &p : primitives) {
@@ -702,7 +709,9 @@ void RecreateSwapchain(android_app* app, InstanceInfo& instanceInfo, vector<Comm
     //CreateMultiViewPipeline(pipelineInfo.layout, instanceInfo.devices[0], app);
     CreateMultiviewFramebuffer(swapchainInfo, instanceInfo.devices[0]);
     CreateDescriptorSets(resourceDescriptor, uniformBuffers, textureObject, instanceInfo.devices[0], swapchainInfo);
-    CreateSharedGraphicsAndPresentCommandBuffers(swapchainInfo, instanceInfo.devices[0], commandInfos[0], renderPass, pipelineInfo, bufferInfo, indices, resourceDescriptor);
+    CreatePostProcessingCommandBuffers(swapchainInfo, instanceInfo.devices[0], commandInfos[0],
+                                       renderPass, pipelineInfo, indices,
+                                       resourceDescriptor);
 
     CreateMultiviewCommandBuffers(bufferInfo, indices, commandInfos[0].pool, swapchainInfo, pipelineInfo.layout, resourceDescriptor, instanceInfo.devices[0]);
 }
@@ -1248,6 +1257,7 @@ void CreateTextureImage(TextureOject& textureObject, android_app* app, DeviceInf
 
     // Load image and dump data to the staging buffer.
     AAsset* file = AAssetManager_open(app->activity->assetManager, "tavern/textures/Main_Pallete.png", AASSET_MODE_BUFFER);
+    //AAsset* file = AAssetManager_open(app->activity->assetManager, "low-poly-town-hall/textures/medival_house_Material_color.png", AASSET_MODE_BUFFER);
     size_t fileLength = AAsset_getLength(file);
     vector<stbi_uc> fileContent(fileLength, 0);
     AAsset_read(file, fileContent.data(), fileLength);
@@ -1567,7 +1577,11 @@ void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, Devic
     EndOneTimeCommands(commandBuffer, deviceInfo, shortLivedCommandInfo);
 }
 
-void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, const DeviceInfo& deviceInfo, CommandInfo& commandInfo, const VkRenderPass& renderPass, const PipelineInfo& pipelineInfo, const BufferInfo& bufferInfo, const vector<uint32_t>& indices, vector<ResourceDescriptor>& descriptors)
+void CreatePostProcessingCommandBuffers(SwapchainInfo &swapchainInfo, const DeviceInfo &deviceInfo,
+                                        CommandInfo &commandInfo, const VkRenderPass &renderPass,
+                                        const PipelineInfo &pipelineInfo,
+                                        const vector<uint32_t> &indices,
+                                        vector<ResourceDescriptor> &descriptors)
 {
     uint32_t size = swapchainInfo.images.size();
 
@@ -1623,6 +1637,7 @@ void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, 
 
         vkCmdBeginRenderPass(commandInfo.buffer[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+        // left eye
         viewport.x = 0.0f;
         viewport.y = 0.0f;
         viewport.width = (float) swapchainInfo.extent.width / 2;
@@ -1642,11 +1657,11 @@ void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, 
         vkCmdBindVertexBuffers(commandInfo.buffer[i], 0, 1, vertexBuffers, offsets);
         vkCmdBindIndexBuffer(commandInfo.buffer[i], intermediatePlane.indexBuffer.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-        uint32_t dynamicOffsets = 0;
-        vkCmdBindDescriptorSets(commandInfo.buffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineInfo.layout, 0, 1, descriptors[0].sets.data(), 1, &dynamicOffsets);
+        vkCmdBindDescriptorSets(commandInfo.buffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineInfo.layout, 0, 1, descriptors[0].sets.data(), 1, 0);
         vkCmdDrawIndexed(commandInfo.buffer[i], static_cast<uint32_t>(intermediatePlane.indices.size()), 1, 0, 0, 0);
 
-        /////////
+
+        // right eye
         viewport.x = (float) swapchainInfo.extent.width / 2;
         viewport.y = 0.0f;
         viewport.width = (float) swapchainInfo.extent.width / 2;
@@ -1659,10 +1674,8 @@ void CreateSharedGraphicsAndPresentCommandBuffers(SwapchainInfo& swapchainInfo, 
         scissor.extent.height = viewport.height;
         vkCmdSetScissor(commandInfo.buffer[i], 0, 1, &scissor);
 
-        dynamicOffsets = dynamicAlignment;
-        vkCmdBindDescriptorSets(commandInfo.buffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineInfo.layout, 0, 1, descriptors[1].sets.data(), 1, &dynamicOffsets);
+        vkCmdBindDescriptorSets(commandInfo.buffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineInfo.layout, 0, 1, descriptors[1].sets.data(), 1, 0);
         vkCmdDrawIndexed(commandInfo.buffer[i], static_cast<uint32_t>(intermediatePlane.indices.size()), 1, 0, 0, 0);
-        /////////
 
         vkCmdEndRenderPass(commandInfo.buffer[i]);
 
@@ -1709,15 +1722,15 @@ VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& 
     DeviceInfo& deviceInfo = instanceInfo.devices[0];
     VkDevice device = deviceInfo.logicalDevices[0];
     if (deviceInfo.sharedGraphicsAndPresentQueue) {
-        DrawSyncPrimitives sharedPrimitive = primitives[0];
+        DrawSyncPrimitives postProcessingPrimitive = primitives[0];
         DrawSyncPrimitives offscreenSyncPrimitives = primitives[1];
 
         // Offscreen rendering
-        vkWaitForFences(device, 1, &sharedPrimitive.inFlightFences[sharedPrimitive.currentFrame], VK_TRUE, UINT64_MAX);
-        vkResetFences(device, 1, &sharedPrimitive.inFlightFences[sharedPrimitive.currentFrame]);
+        vkWaitForFences(device, 1, &postProcessingPrimitive.inFlightFences[postProcessingPrimitive.currentFrame], VK_TRUE, UINT64_MAX);
+        vkResetFences(device, 1, &postProcessingPrimitive.inFlightFences[postProcessingPrimitive.currentFrame]);
 
         uint32_t imageIndex;
-        VkResult result = vkAcquireNextImageKHR(device, swapchainInfo.swapchain, UINT64_MAX, sharedPrimitive.imageAvailableSemaphores[sharedPrimitive.currentFrame], VK_NULL_HANDLE, &imageIndex);
+        VkResult result = vkAcquireNextImageKHR(device, swapchainInfo.swapchain, UINT64_MAX, postProcessingPrimitive.imageAvailableSemaphores[postProcessingPrimitive.currentFrame], VK_NULL_HANDLE, &imageIndex);
         if (result == VK_ERROR_OUT_OF_DATE_KHR) {
             RecreateSwapchain(app, instanceInfo, commandInfos, pipelineInfo, renderPass, swapchainInfo, bufferInfo, indices, uniformBuffers, textureOject, resourceDescriptor);
         } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
@@ -1735,7 +1748,7 @@ VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& 
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers = &multiviewPass.commandBuffers[imageIndex];
         submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = &offscreenSyncPrimitives.renderFinishedSemaphores[sharedPrimitive.currentFrame];
+        submitInfo.pSignalSemaphores = &offscreenSyncPrimitives.renderFinishedSemaphores[postProcessingPrimitive.currentFrame];
         VkQueue graphicsQueue = deviceInfo.queues[device][(int)VK_QUEUE_GRAPHICS_BIT][0].queue;
         result = vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
         if (result != VK_SUCCESS) {
@@ -1745,13 +1758,13 @@ VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& 
         }
 
         submitInfo.waitSemaphoreCount = 2;
-        VkSemaphore distortionWaitSemaphores[] = { sharedPrimitive.imageAvailableSemaphores[sharedPrimitive.currentFrame], offscreenSyncPrimitives.renderFinishedSemaphores[sharedPrimitive.currentFrame] };
+        VkSemaphore distortionWaitSemaphores[] = { postProcessingPrimitive.imageAvailableSemaphores[postProcessingPrimitive.currentFrame], offscreenSyncPrimitives.renderFinishedSemaphores[postProcessingPrimitive.currentFrame] };
         submitInfo.pWaitSemaphores = distortionWaitSemaphores;
         VkPipelineStageFlags distortionWaitStages[] = { VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT };
         submitInfo.pWaitDstStageMask = distortionWaitStages;
         submitInfo.pCommandBuffers = &commandInfos[0].buffer[imageIndex];
-        submitInfo.pSignalSemaphores = &sharedPrimitive.renderFinishedSemaphores[sharedPrimitive.currentFrame];
-        result = vkQueueSubmit(graphicsQueue, 1, &submitInfo, sharedPrimitive.inFlightFences[sharedPrimitive.currentFrame]);
+        submitInfo.pSignalSemaphores = &postProcessingPrimitive.renderFinishedSemaphores[postProcessingPrimitive.currentFrame];
+        result = vkQueueSubmit(graphicsQueue, 1, &submitInfo, postProcessingPrimitive.inFlightFences[postProcessingPrimitive.currentFrame]);
         if (result != VK_SUCCESS) {
             string code = to_string(result);
             throw runtime_error("vkQueueSubmit: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
@@ -1761,7 +1774,7 @@ VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& 
         VkPresentInfoKHR presentInfo = {};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = &sharedPrimitive.renderFinishedSemaphores[sharedPrimitive.currentFrame];
+        presentInfo.pWaitSemaphores = &postProcessingPrimitive.renderFinishedSemaphores[postProcessingPrimitive.currentFrame];
         VkSwapchainKHR swapChains[] = { swapchainInfo.swapchain };
         presentInfo.swapchainCount = 1;
         presentInfo.pSwapchains = swapChains;
@@ -1778,7 +1791,7 @@ VkResult DrawFrame(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& 
             throw runtime_error("vkQueuePresentKHR: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
         }
 
-        sharedPrimitive.currentFrame = (sharedPrimitive.currentFrame + 1) % sharedPrimitive.concurrentFrameCount;
+        postProcessingPrimitive.currentFrame = (postProcessingPrimitive.currentFrame + 1) % postProcessingPrimitive.concurrentFrameCount;
         /////////////////////////////////////////////////////////////////////
         /*DrawSyncPrimitives sharedPrimitive = primitives[0];
         vkWaitForFences(device, 1, &sharedPrimitive.inFlightFences[sharedPrimitive.currentFrame], VK_TRUE, numeric_limits<uint64_t>::max());
@@ -1888,6 +1901,9 @@ void DeleteVulkan(InstanceInfo& instanceInfo, set<VkCommandPool>& commandPools, 
             if (primitives[i].imageAvailableSemaphores.size() > 0) {
                 vkDestroySemaphore(device, primitives[i].imageAvailableSemaphores[j], nullptr);
             }
+            if (primitives[i].inFlightFences.size() == 0) {
+                break;
+            }
             vkDestroyFence(device, primitives[i].inFlightFences[j], nullptr);
         }
     }
@@ -1937,11 +1953,10 @@ void DeleteRenderData(const InstanceInfo& instanceInfo, vector<CommandInfo>& com
             vkDestroyImageView(device, multiviewPass.color[eye].view[i], nullptr);
             vkFreeMemory(device, multiviewPass.color[eye].memory[i], nullptr);
             vkDestroyImage(device, multiviewPass.color[eye].image[i], nullptr);
-
-            vkDestroyImageView(device, multiviewPass.depth[eye].view[i], nullptr);
-            vkFreeMemory(device, multiviewPass.depth[eye].memory[i], nullptr);
-            vkDestroyImage(device, multiviewPass.depth[eye].image[i], nullptr);
         }
+        vkDestroyImageView(device, multiviewPass.depth[eye].view[0], nullptr);
+        vkFreeMemory(device, multiviewPass.depth[eye].memory[0], nullptr);
+        vkDestroyImage(device, multiviewPass.depth[eye].image[0], nullptr);
     }
 
     vkFreeCommandBuffers(device, commandInfos[0].pool, multiviewPass.commandBuffers.size(), multiviewPass.commandBuffers.data());
@@ -2080,9 +2095,6 @@ void UpdateDeviceOrientation(const float rotationMatrix[], bool columnMajorInput
 {
     cameraRotationMatrix.resize(16);
     if (columnMajorInput) {
-//        for (int i = 0; i < 16; i++) {
-//            cameraRotationMatrix[i] = rotationMatrix[i];
-//        }
         std::copy(rotationMatrix, rotationMatrix + 16, &cameraRotationMatrix[0]);
     } else {
         for (int i = 0; i < 4; i++) {
@@ -2134,17 +2146,19 @@ void UpdateMVP(vector<VkDeviceMemory>& mvpMemory, uint32_t currentImageIndex, De
     float top = wd2;
     float bottom = -wd2;
 
-    mat4 transform(0.0f, -1.0f, 0.0f, 0.0f,
-                   0.0f, 0.0f, 1.0f, 0.0f,
-                  - 1.0f, 0.0f, 0.0f, 0.0f,
-                   0.0f, 0.0f, 0.0f, 1.0f);
+//    mat4 transform(0.0f, -1.0f, 0.0f, 0.0f,
+//                   0.0f, 0.0f, 1.0f, 0.0f,
+//                  - 1.0f, 0.0f, 0.0f, 0.0f,
+//                   0.0f, 0.0f, 0.0f, 1.0f);
 
     //if (cameraRotationMatrix.size() > 0) {
         mat4 cameraRotation = glm::make_mat4(&cameraRotationMatrix[0]);
-        glm::quat q(0.7071068f, 0.0f, -0.7071068f, 0.0f);
-        mat4 qM = glm::mat4_cast(q);
-        glm::quat invQ = glm::inverse(q);
-        mat4 invQM = glm::mat4_cast(invQ);
+
+//        glm::quat q(0.7071068f, 0.0f, -0.7071068f, 0.0f);
+//        mat4 qM = glm::mat4_cast(q);
+//        glm::quat invQ = glm::inverse(q);
+//        mat4 invQM = glm::mat4_cast(invQ);
+
         //cameraRotation = cameraRotation * invQM;
         //cameraRotation = transform * cameraRotation;
             //glm::quat qScreen(glm::angleAxis(3.141592f/2.0f*2.0f, vec3(0.0f, 0.0f, 1.0f)));
@@ -2215,7 +2229,7 @@ void UpdateMVP(vector<VkDeviceMemory>& mvpMemory, uint32_t currentImageIndex, De
 
 void CreateDescriptorPool(VkDescriptorPool& descriptorPool, DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo)
 {
-    size_t size = swapchainInfo.images.size();
+    size_t size = 1;//swapchainInfo.images.size();
     VkDescriptorPoolSize poolSizes[] = { {}, {}, {} };
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = size * 1 * 2;
@@ -2281,7 +2295,7 @@ void CreateDescriptorSets(std::vector<ResourceDescriptor>& descriptor, vector<Vk
 
             VkWriteDescriptorSet descriptorWrites[] = { {}, {}, {}, {} };
             descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[0].dstSet = descriptor[eye].sets[i];
+            descriptorWrites[0].dstSet = descriptor[eye].sets[0];
             descriptorWrites[0].dstBinding = 0;
             descriptorWrites[0].dstArrayElement = 0;
             descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -2289,7 +2303,7 @@ void CreateDescriptorSets(std::vector<ResourceDescriptor>& descriptor, vector<Vk
             descriptorWrites[0].pBufferInfo = &bufferInfo;
 
             descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[1].dstSet = descriptor[eye].sets[i];
+            descriptorWrites[1].dstSet = descriptor[eye].sets[0];
             descriptorWrites[1].dstBinding = 1;
             descriptorWrites[1].dstArrayElement = 0;
             descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
@@ -2297,7 +2311,7 @@ void CreateDescriptorSets(std::vector<ResourceDescriptor>& descriptor, vector<Vk
             descriptorWrites[1].pBufferInfo = &bufferDynamicInfo;
 
             descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[2].dstSet = descriptor[eye].sets[i];
+            descriptorWrites[2].dstSet = descriptor[eye].sets[0];
             descriptorWrites[2].dstBinding = 2;
             descriptorWrites[2].dstArrayElement = 0;
             descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -2517,7 +2531,7 @@ void CreateMultiviewDepth(VkFormat& depthFormat, SwapchainInfo& swapchainInfo, D
         VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, deviceInfo.physicalDevice
     );
 
-    size_t size = swapchainInfo.images.size();
+    size_t size = 1;//swapchainInfo.images.size();
     for (int eye = 0; eye < 2; eye++) {
         multiviewPass.depth[eye].image.resize(size);
         multiviewPass.depth[eye].memory.resize(size);
@@ -2687,7 +2701,7 @@ void CreateMultiviewFramebuffer(SwapchainInfo& swapchainInfo, DeviceInfo& device
         for (int i = 0; i < size; i++) {
             VkImageView attachments[3];
             attachments[0] = swapchainInfo.msaa.view;
-            attachments[1] = multiviewPass.depth[eye].view[i];
+            attachments[1] = multiviewPass.depth[eye].view[0];
             attachments[2] = multiviewPass.color[eye].view[i];
 
             VkFramebufferCreateInfo framebufferCI = {};
@@ -2715,8 +2729,8 @@ void CreateIntermediatePlaneData(SwapchainInfo& swapchainInfo, DeviceInfo& devic
 {
     // Vertices
     // 2560 x 1440
-    int rowNodes = 32;//swapchainInfo.extent.height / 40; // 36
-    int colNodes = 32;//swapchainInfo.extent.width / 40; // 64
+    int rowNodes = 32;
+    int colNodes = 32;
     for (int r = 0; r <= rowNodes; r++) {
         for (int c = 0; c <= colNodes; c++) {
             intermediatePlane.vertices.push_back(vec3(1.0f * c / colNodes * 2 - 1, 1.0f * r / rowNodes * 2 - 1, 0));
@@ -2777,8 +2791,8 @@ void CreateIntermediatePlaneData(SwapchainInfo& swapchainInfo, DeviceInfo& devic
 void CreateMultiViewPipeline(VkPipelineLayout pipelineLayout, DeviceInfo& deviceInfo, android_app* app)
 {
     // Create shader stage.
-    VkShaderModule vertexShader = LoadShaderFromFile("shaders/triangle.vert.spv", app, deviceInfo);
-    VkShaderModule fragmentShader = LoadShaderFromFile("shaders/triangle.frag.spv", app, deviceInfo);
+    VkShaderModule vertexShader = LoadShaderFromFile("shaders/offscreen.vert.spv", app, deviceInfo);
+    VkShaderModule fragmentShader = LoadShaderFromFile("shaders/offscreen.frag.spv", app, deviceInfo);
     VkPipelineShaderStageCreateInfo shaderStages[] = {
          {
              .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -2794,7 +2808,6 @@ void CreateMultiViewPipeline(VkPipelineLayout pipelineLayout, DeviceInfo& device
          }
     };
 
-    // ok
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     auto bindingDescription = VertexV1::GetBindingDescription(0);
@@ -2804,7 +2817,6 @@ void CreateMultiViewPipeline(VkPipelineLayout pipelineLayout, DeviceInfo& device
     vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
     vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
-    // ok
     VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -2824,7 +2836,6 @@ void CreateMultiViewPipeline(VkPipelineLayout pipelineLayout, DeviceInfo& device
     scissor.offset = {0, 0};
     scissor.extent = swapchainInfo.extent;*/
 
-    // ok
     VkPipelineViewportStateCreateInfo viewportState = {};
     viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     viewportState.viewportCount = 1;
@@ -2832,7 +2843,6 @@ void CreateMultiViewPipeline(VkPipelineLayout pipelineLayout, DeviceInfo& device
     viewportState.scissorCount = 1;
     //viewportState.pScissors = &scissor;
 
-    // ok
     VkPipelineRasterizationStateCreateInfo rasterizer = {};
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterizer.depthClampEnable = VK_FALSE;
@@ -2843,13 +2853,11 @@ void CreateMultiViewPipeline(VkPipelineLayout pipelineLayout, DeviceInfo& device
     rasterizer.depthBiasEnable = VK_FALSE;
     rasterizer.lineWidth = 1.0f;
 
-    // ok
     VkPipelineMultisampleStateCreateInfo multisampling = {};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.rasterizationSamples = deviceInfo.sampleCount;
     multisampling.sampleShadingEnable = VK_FALSE;
 
-    // ok
     VkPipelineDepthStencilStateCreateInfo depthStencil = {};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depthStencil.depthTestEnable = VK_TRUE;
@@ -2858,12 +2866,10 @@ void CreateMultiViewPipeline(VkPipelineLayout pipelineLayout, DeviceInfo& device
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.stencilTestEnable = VK_FALSE;
 
-    // ok
     VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
     colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     colorBlendAttachment.blendEnable = VK_FALSE;
 
-    // ok
     VkPipelineColorBlendStateCreateInfo colorBlending = {};
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.logicOpEnable = VK_FALSE;
@@ -2871,7 +2877,6 @@ void CreateMultiViewPipeline(VkPipelineLayout pipelineLayout, DeviceInfo& device
     colorBlending.attachmentCount = 1;
     colorBlending.pAttachments = &colorBlendAttachment;
 
-    // ok
     VkDynamicState dynamicStateEnables[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
     VkPipelineDynamicStateCreateInfo dynamicState = {};
     dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -3077,19 +3082,19 @@ void CreateMultiviewCommandBuffers(const BufferInfo& bufferInfo, const vector<ui
 
 void CreateMultiviewSyncs(DrawSyncPrimitives& synPrimitive, DeviceInfo& deviceInfo)
 {
-    synPrimitive.inFlightFences.resize(synPrimitive.concurrentFrameCount);
+//    synPrimitive.inFlightFences.resize(synPrimitive.concurrentFrameCount);
     VkResult result;
     VkDevice device = deviceInfo.logicalDevices[0];
-    VkFenceCreateInfo fenceInfo = {};
-    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    for (auto& fence : synPrimitive.inFlightFences) {
-        result = vkCreateFence(device, &fenceInfo, nullptr, &fence);
-        if (result != VK_SUCCESS) {
-            string code = to_string(result);
-            throw runtime_error("vkAllocateCommandBuffers: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
-        }
-    }
+//    VkFenceCreateInfo fenceInfo = {};
+//    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+//    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+//    for (auto& fence : synPrimitive.inFlightFences) {
+//        result = vkCreateFence(device, &fenceInfo, nullptr, &fence);
+//        if (result != VK_SUCCESS) {
+//            string code = to_string(result);
+//            throw runtime_error("vkAllocateCommandBuffers: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
+//        }
+//    }
 
     VkSemaphoreCreateInfo semaphoreInfo = {};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;

@@ -36,7 +36,7 @@ namespace AndroidNative {
 
         function<void(float rotationVector[])> onGetRotationVector;
 
-        ASensorEventQueue* accelerometerEventQueue;
+        ASensorEventQueue* rotationVectorEventQueue;
     private:
         void Activate();
         void Deactivate();
@@ -47,8 +47,8 @@ namespace AndroidNative {
         bool _enabled;
         bool _quit;
 
-        ASensorManager* sensorManager;
-        const ASensor* accelerometer;
+        ASensorManager* _sensorManager;
+        const ASensor* _rotationVector;
     };
 }
 
