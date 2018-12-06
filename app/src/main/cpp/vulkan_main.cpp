@@ -240,8 +240,8 @@ bool InitVulkan(android_app* app, InstanceInfo& instanceInfo, SwapchainInfo& swa
 
     vertices.clear();
     indices.clear();
-    LoadModel((string(app->activity->externalDataPath) + string("/Traven.obj")).c_str(), vertices, indices, 0.0078125f);
-    //LoadModel((string(app->activity->externalDataPath) + string("/medival_house.obj")).c_str(), vertices, indices, 1.0f);
+    //LoadModel((string(app->activity->externalDataPath) + string("/Traven.obj")).c_str(), vertices, indices, 0.0078125f);
+    LoadModel((string(app->activity->externalDataPath) + string("/medival_house.obj")).c_str(), vertices, indices, 1.0f);
     CreateVertexBuffer(vertices, bufferInfo, instanceInfo.devices[0], commandInfos[1]);
     CreateIndexBuffer(indices, bufferInfo, instanceInfo.devices[0], commandInfos[1]);
     CreateUniformBuffers(uniformBuffers, uniformBuffersMemory, instanceInfo.devices[0], swapchainInfo);
@@ -1256,8 +1256,8 @@ void CreateTextureImage(TextureOject& textureObject, android_app* app, DeviceInf
     VkFormat format = FindSupportedFormat({ VK_FORMAT_R8G8B8A8_UNORM }, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT, deviceInfo.physicalDevice);
 
     // Load image and dump data to the staging buffer.
-    AAsset* file = AAssetManager_open(app->activity->assetManager, "tavern/textures/Main_Pallete.png", AASSET_MODE_BUFFER);
-    //AAsset* file = AAssetManager_open(app->activity->assetManager, "low-poly-town-hall/textures/medival_house_Material_color.png", AASSET_MODE_BUFFER);
+    //AAsset* file = AAssetManager_open(app->activity->assetManager, "tavern/textures/Main_Pallete.png", AASSET_MODE_BUFFER);
+    AAsset* file = AAssetManager_open(app->activity->assetManager, "low-poly-town-hall/textures/medival_house_Material_color.png", AASSET_MODE_BUFFER);
     size_t fileLength = AAsset_getLength(file);
     vector<stbi_uc> fileContent(fileLength, 0);
     AAsset_read(file, fileContent.data(), fileLength);
@@ -2118,7 +2118,7 @@ void UpdateMVP(vector<VkDeviceMemory>& mvpMemory, uint32_t currentImageIndex, De
 
     MVP mvp = {};
     //mvp.model = rotate(mat4(1.0f), /*radians(180.0f)*/time * radians(90.0f) * 0.0f, vec3(0.0f, 0.0f, 1.0f));
-    mvp.model = rotate(mat4(1.0f), radians(45.0f), vec3(0.0f, 1.0f, 0.0f));
+    mvp.model = rotate(mat4(1.0f), radians(0.0f), vec3(0.0f, 1.0f, 0.0f));
     //mvp.view = lookAt(vec3(0.0f, 0.0f, 3.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
     //mvp.projection = perspective(radians(60.0f), swapchainInfo.extent.width / (float) swapchainInfo.extent.height, 0.1f, 32.0f);
     //mvp.projection[1][1] *= -1;
@@ -2166,7 +2166,7 @@ void UpdateMVP(vector<VkDeviceMemory>& mvpMemory, uint32_t currentImageIndex, De
 //        mat4 qScreenM = glm::mat4_cast(qScreen);
 //        glm::quat invQScreen = glm::inverse(qScreen);
 //        mat4 invQScreenM = glm::mat4_cast(qScreen);
-        mat4 eye = glm::translate(mat4(1.0f), vec3(-0.5f * eyeSeparation, 0.0f, 3.0f));
+        mat4 eye = glm::translate(mat4(1.0f), vec3(-0.5f * eyeSeparation, 4.0f, 0.0f));
 //        mat4 view0 = glm::transpose(cameraRotation * invQM) * glm::inverse(eye);
 //        mat4 i = glm::transpose(cameraRotation) * qM;
         //mat4 view = glm::transpose(cameraRotation * invQM) * glm::inverse(eye);
@@ -2187,7 +2187,7 @@ void UpdateMVP(vector<VkDeviceMemory>& mvpMemory, uint32_t currentImageIndex, De
     // Right eye
     left = -aspectRatio * wd2 - 0.5f * eyeSeparation * ndfl;
     right = aspectRatio * wd2 - 0.5f * eyeSeparation * ndfl;
-    eye = glm::translate(mat4(1.0f), vec3(0.5f * eyeSeparation, 0.0f, 3.0f));
+    eye = glm::translate(mat4(1.0f), vec3(0.5f * eyeSeparation, 4.0f, 0.0f));
     view = glm::transpose(cameraRotation) * glm::inverse(eye);
     base->view = view;
     //base->view = lookAt(vec3(0.5f * eyeSeparation, 0.0f, 3.0f), vec3(0.5f * eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
@@ -2849,7 +2849,7 @@ void CreateMultiViewPipeline(VkPipelineLayout pipelineLayout, DeviceInfo& device
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
     rasterizer.lineWidth = 1.0f;
 
