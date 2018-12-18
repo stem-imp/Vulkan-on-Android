@@ -129,7 +129,7 @@ bool LayerAndExtension::InitializeExtensionNames(const vector<ExtensionInfo>& pr
             // skip the one already inside
             bool duplicate = false;
             for (uint32_t j = 0; j < names->size(); ++j) {
-                if (!strcmp(ext.prop[i].extensionName, (*names)[j])) {
+                if (!strcmp(ext.prop[i].extensionName, (*names)[j]) || ext.prop[i].extensionName[0] == 0) {
                     duplicate = true;
                     break;
                 }
@@ -290,7 +290,7 @@ void LayerAndExtension::InitializeDeviceLayersAndExtensions(VkPhysicalDevice phy
     // get all supported layers props
     _deviceLayerCount = 0;
     VkResult result = vkEnumerateDeviceLayerProperties(_physicalDev, &_deviceLayerCount, nullptr);
-    if (result == VK_SUCCESS) {
+    if (result != VK_SUCCESS) {
         string code = to_string(result);
         throw runtime_error("vkEnumerateDeviceLayerProperties: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
     }
@@ -322,9 +322,9 @@ void LayerAndExtension::InitializeDeviceLayersAndExtensions(VkPhysicalDevice phy
 #endif
 
     for (int i = 0; i < _deviceLayerCount; i++) {
-        if (!strcmp(_deviceLayerProperties[i].layerName, UNIQUE_OBJECT_LAYER)) {
+        /*if (!strcmp(_deviceLayerProperties[i].layerName, UNIQUE_OBJECT_LAYER)) {
             continue;
-        }
+        }*/
         DebugLog("deviceLayerName: %s", _deviceLayerProperties[i].layerName);
         _deviceLayers.push_back(_deviceLayerProperties[i].layerName);
     }
