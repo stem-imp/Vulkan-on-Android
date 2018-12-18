@@ -1,14 +1,14 @@
-#include "event_loop.hpp"
-#include "log.hpp"
+#include "androidutility/eventloop/event_loop.h"
+#include "log/log.h"
 #include <memory>
 
 using std::unique_ptr;
 using AndroidNative::EventLoop;
-using AndroidNative::Log;
+using Utility::Log;
 
-static status OnActivate();
+static bool OnActivate();
 static void OnDeactivate();
-static status OnStep();
+static bool OnStep(android_app* app);
 
 static void OnStart(void);
 static void OnResume(void);
@@ -22,7 +22,7 @@ static void OnGainFocus(void);
 static void OnLostFocus(void);
 
 static void OnSaveInstanceState(void**, size_t*);
-static void OnConfigurationChanged(void);
+static void OnConfigurationChanged(android_app* app);
 static void OnLowMemory(void);
 
 /**
@@ -56,10 +56,10 @@ void android_main(struct android_app* state)
     loop->Run();
 }
 
-static status OnActivate()
+static bool OnActivate()
 {
     DebugLog("App OnActivate");
-    return OK;
+    return true;
 }
 
 static void OnDeactivate()
@@ -67,10 +67,10 @@ static void OnDeactivate()
     DebugLog("App OnDeactivate");
 }
 
-status OnStep()
+bool OnStep(android_app*)
 {
     DebugLog("App OnStep");
-    return OK;
+    return true;
 }
 
 void OnStart(void)
@@ -123,7 +123,7 @@ void OnSaveInstanceState(void**, size_t*)
     DebugLog("App OnSaveInstanceState");
 }
 
-void OnConfigurationChanged(void)
+void OnConfigurationChanged(android_app* app)
 {
     DebugLog("App OnConfigurationChanged");
 }

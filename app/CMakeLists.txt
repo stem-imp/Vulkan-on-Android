@@ -32,7 +32,7 @@ add_library( # Sets the name of the library.
              SHARED
 
              # Provides a relative path to your source file(s).
-             src/main/cpp/log.cpp )
+        src/main/cpp/androidutility/log/log_android.cpp)
 
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by
@@ -61,7 +61,7 @@ add_library( # Sets the name of the library.
              SHARED
 
              # Provides a relative path to your source file(s).
-             src/main/cpp/event_loop.cpp
+        src/main/cpp/androidutility/eventloop/event_loop.cpp
              src/main/cpp/main.cpp )
 
 # Specifies libraries CMake should link to your target library. You
