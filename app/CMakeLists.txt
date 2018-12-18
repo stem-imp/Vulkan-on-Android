@@ -10,29 +10,24 @@ include_directories(${ANDROID_NDK}/sources/android/native_app_glue)
 
 # Export ANativeActivity_onCreate(),
 # Refer to: https://github.com/android-ndk/ndk/issues/381.
-set(CMAKE_SHARED_LINKER_FLAGS
-    "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
 
 # build native_app_glue as a static lib
-add_library(native_app_glue STATIC
-    ${ANDROID_NDK}/sources/android/native_app_glue/android_native_app_glue.c)
+add_library(native_app_glue STATIC ${ANDROID_NDK}/sources/android/native_app_glue/android_native_app_glue.c)
 
 # now set up compilation options
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Werror")
+set(CMAKE_CXX_clone "${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
 
 # Creates and names a library, sets it as either STATIC
 # or SHARED, and provides the relative paths to its source code.
 # You can define multiple libraries, and CMake builds them for you.
 # Gradle automatically packages shared libraries with your APK.
 
-add_library( # Sets the name of the library.
-             log-cpp
-
-             # Sets the library as a shared library.
-             SHARED
-
-             # Provides a relative path to your source file(s).
-        src/main/cpp/androidutility/log/log_android.cpp)
+# android-utility-cpp-lib ###############
+add_library(android-utility-cpp-lib SHARED
+            src/main/cpp/androidutility/log/log_android.cpp
+            src/main/cpp/androidutility/eventloop/event_loop.cpp)
 
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by
@@ -45,10 +40,10 @@ find_library( # Sets the name of the path variable.
 
               # Specifies the name of the NDK library that
               # you want CMake to locate.
-              log )
+              log)
 
 target_link_libraries( # Specifies the target library.
-                       log-cpp
+                       android-utility-cpp-lib android
 
                        # Links the target library to the log library
                        # included in the NDK.
@@ -61,7 +56,6 @@ add_library( # Sets the name of the library.
              SHARED
 
              # Provides a relative path to your source file(s).
-        src/main/cpp/androidutility/eventloop/event_loop.cpp
              src/main/cpp/main.cpp )
 
 # Specifies libraries CMake should link to your target library. You
@@ -70,6 +64,9 @@ add_library( # Sets the name of the library.
 
 target_link_libraries( # Specifies the target library.
                        main
-                       log-cpp
+
                        android
+                       android-utility-cpp-lib
                        native_app_glue )
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_clone}")
