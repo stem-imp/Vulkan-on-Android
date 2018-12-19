@@ -8,7 +8,7 @@ using Utility::Log;
 
 static bool OnActivate();
 static void OnDeactivate();
-static bool OnStep(android_app* app);
+static bool OnStep();
 
 static void OnStart(void);
 static void OnResume(void);
@@ -67,7 +67,7 @@ static void OnDeactivate()
     DebugLog("App OnDeactivate");
 }
 
-bool OnStep(android_app*)
+bool OnStep()
 {
     DebugLog("App OnStep");
     return true;
