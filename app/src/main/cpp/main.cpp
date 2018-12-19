@@ -222,7 +222,8 @@ void OnInitWindow(android_app* app)
 
 
     float priorities[] = {
-        1.0f,
+        //1.0f,
+        UINT32_MAX
     };
     VkDeviceQueueCreateInfo queueCreateInfo{
         .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
@@ -230,10 +231,7 @@ void OnInitWindow(android_app* app)
         .flags = 0,
         .queueCount = 1,
         .queueFamilyIndex = queueFamilyIndex,
-        // Send nullptr for queue priority so debug extension could
-        // catch the bug and call back app's debug function
-        //.pQueuePriorities = priorities
-        .pQueuePriorities = nullptr
+        .pQueuePriorities = priorities
     };
     const uint32_t deviceExtensionCount = requestedDeviceExtensionNames.size();
     VkDeviceCreateInfo deviceCreateInfo{

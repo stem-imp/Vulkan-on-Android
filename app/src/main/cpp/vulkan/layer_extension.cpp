@@ -29,7 +29,6 @@ LayerAndExtension::LayerAndExtension(void):
 {
     uint32_t instanceLayerCount;
     VK_CHECK_RESULT(vkEnumerateInstanceLayerProperties(&instanceLayerCount, nullptr));
-
     if (instanceLayerCount) {
         _instanceLayerProperties.resize(instanceLayerCount);
         VK_CHECK_RESULT(vkEnumerateInstanceLayerProperties(&instanceLayerCount, _instanceLayerProperties.data()));
