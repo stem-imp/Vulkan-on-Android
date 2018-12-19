@@ -149,7 +149,9 @@ void OnInitWindow(android_app* app)
     };
     VK_CHECK_RESULT(vkCreateInstance(&instanceCreateInfo, nullptr, &appInstance));
     if (layerAndExtension.enableValidationLayers) {
-        layerAndExtension.HookDebugReportExtension(appInstance);
+        if (!layerAndExtension.HookDebugReportExtension(appInstance)) {
+            DebugLog("Fail to enable debugging feature.");
+        }
     }
 
 
