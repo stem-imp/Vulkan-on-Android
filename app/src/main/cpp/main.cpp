@@ -1,24 +1,20 @@
-#include "event_loop.hpp"
-#include "log.hpp"
-#include "layer_extension.hpp"
-#include "vulkan/vulkan.h"
+#include "log/log.h"
+#include "androidutility/eventloop/event_loop.h"
+#include "vulkan/vulkan_utility.h"
+#include "vulkan/layer_extension.h"
 #include <memory>
-#include <cassert>
 
 using std::unique_ptr;
+using Utility::Log;
 using AndroidNative::EventLoop;
-using AndroidNative::Log;
 
-static bool initialized = false;
+static VkInstance appInstance  = VK_NULL_HANDLE;
+static VkPhysicalDevice appGpu = VK_NULL_HANDLE;
+static VkDevice appDevice      = VK_NULL_HANDLE;
 
-VkInstance appInstance;
-VkPhysicalDevice appGpu;
-VkDevice appDevice;
-//VkSurfaceKHR appSurface;
-
-static status OnActivate();
+static bool OnActivate();
 static void OnDeactivate();
-static status OnStep();
+static bool OnStep();
 
 static void OnStart(void);
 static void OnResume(void);
@@ -66,10 +62,10 @@ void android_main(struct android_app* state)
     loop->Run();
 }
 
-static status OnActivate()
+static bool OnActivate()
 {
     DebugLog("App OnActivate");
-    return OK;
+    return true;
 }
 
 static void OnDeactivate()
@@ -77,10 +73,10 @@ static void OnDeactivate()
     DebugLog("App OnDeactivate");
 }
 
-status OnStep()
+bool OnStep()
 {
-    DebugLog("App OnStep");
-    return OK;
+    //DebugLog("App OnStep");
+    return true;
 }
 
 void OnStart(void)
@@ -113,126 +109,116 @@ void OnInitWindow(android_app* app)
     DebugLog("App OnInitWindow");
 
     if (!InitVulkan()) {
-        Log::Error("Vulkan is unavailable, install vulkan and re-start");
-        return;
-    }
-    if (initialized) {
+        Log::Error("Vulkan is unavailable, install vulkan and re-start.");
         return;
     }
 
-    LayerAndExtension layerAndExt;
-    layerAndExt.AddInstanceExtension(layerAndExt.GetDebugExtensionName());
+    vector<const char*> requestedInstanceExtensionNames = { VK_KHR_SURFACE_EXTENSION_NAME };
+    AppendInstanceExtension(requestedInstanceExtensionNames);
+    LayerAndExtension layerAndExtension;
+    if (layerAndExtension.enableValidationLayers) {
+        requestedInstanceExtensionNames.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 
+        vector<const char*> requestedInstanceLayerNames = {
+            LayerAndExtension::GOOGLE_THREADING_LAYER,// LayerAndExtension::GOOGLE_UNIQUE_OBJECT_LAYER,
+            LayerAndExtension::LUNARG_CORE_VALIDATION_LAYER, LayerAndExtension::LUNARG_OBJECT_TRACKER_LAYER,
+            LayerAndExtension::LUNARG_PARAMETER_VALIDATION_LAYER
+        };
+        layerAndExtension.EnableInstanceLayers(requestedInstanceLayerNames);
+    }
+    layerAndExtension.EnableInstanceExtensions(requestedInstanceExtensionNames);
     VkApplicationInfo appInfo = {
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
         .pNext = nullptr,
-        .apiVersion = VK_MAKE_VERSION(1, 0, 0),
+        .apiVersion = GetAPIVersion(),
         .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
         .engineVersion = VK_MAKE_VERSION(1, 0, 0),
-        .pApplicationName = "Android Vulkan",
+        .pApplicationName = "Vulkan on Android",
         .pEngineName = "vulkan",
     };
+    vector<const char*> enabledInstanceLayerNames = layerAndExtension.EnabledInstanceLayerNames();
+    vector<const char*> enabledInstanceExtensionNames = layerAndExtension.EnabledInstanceExtensionNames();
     VkInstanceCreateInfo instanceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
         .pNext = nullptr,
         .pApplicationInfo = &appInfo,
-        .enabledExtensionCount = layerAndExt.InstanceExtensionCount(),
-        .ppEnabledExtensionNames = static_cast<const char* const*>(layerAndExt.InstanceExtensionNames()),
-        .enabledLayerCount = layerAndExt.InstanceLayerCount(),
-        .ppEnabledLayerNames = static_cast<const char* const*>(layerAndExt.InstanceLayerNames()),
+        .enabledExtensionCount = layerAndExtension.EnabledInstanceExtensionCount(),
+        .ppEnabledExtensionNames = enabledInstanceExtensionNames.data(),
+        .enabledLayerCount = layerAndExtension.EnabledInstanceLayerCount(),
+        .ppEnabledLayerNames = enabledInstanceLayerNames.data(),
     };
-    VkResult result;
-    result = vkCreateInstance(&instanceCreateInfo, nullptr, &appInstance);
-    if (result != VK_SUCCESS) {
-        string code = to_string(result);
-        throw runtime_error("vkCreateInstance: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
+    VK_CHECK_RESULT(vkCreateInstance(&instanceCreateInfo, nullptr, &appInstance));
+    if (layerAndExtension.enableValidationLayers) {
+        layerAndExtension.HookDebugReportExtension(appInstance);
     }
 
-    layerAndExt.HookDebugReportExtension(appInstance);
 
-    // Find one GPU to use:
-    // On Android, every GPU device is equal -- supporting
-    // graphics/compute/present
-    // for this sample, we use the very first GPU device found on the system
     uint32_t gpuCount = 0;
-    result = vkEnumeratePhysicalDevices(appInstance, &gpuCount, nullptr);
-    if (result != VK_SUCCESS) {
-        string code = to_string(result);
-        throw runtime_error("vkEnumeratePhysicalDevices: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
-    }
+    VK_CHECK_RESULT(vkEnumeratePhysicalDevices(appInstance, &gpuCount, nullptr));
     VkPhysicalDevice tmpGpus[gpuCount];
-    result = vkEnumeratePhysicalDevices(appInstance, &gpuCount, tmpGpus);
-    if (result != VK_SUCCESS) {
-        string code = to_string(result);
-        throw runtime_error("vkEnumeratePhysicalDevices: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
+    VK_CHECK_RESULT(vkEnumeratePhysicalDevices(appInstance, &gpuCount, tmpGpus));
+    appGpu = tmpGpus[0];
+    LayerAndExtension::ExtensionGroup extInfo = { 0, {} };
+    VK_CHECK_RESULT(vkEnumerateDeviceExtensionProperties(appGpu, nullptr, &extInfo.count, nullptr));
+    DebugLog("%d device extension properties.", extInfo.count);
+    vector<LayerAndExtension::ExtensionGroup> supportedDeviceExtensions;
+    if (extInfo.count) {
+        extInfo.properties.resize(extInfo.count);
+        VK_CHECK_RESULT(vkEnumerateDeviceExtensionProperties(appGpu,
+                                                             nullptr,
+                                                             &extInfo.count,
+                                                             extInfo.properties.data()));
+        supportedDeviceExtensions.emplace_back(extInfo);
     }
-    appGpu = tmpGpus[0];  // Pick up the first GPU Device
+    size_t size = layerAndExtension.EnabledInstanceLayerNames().size();
+    for (size_t i = 0; i < size; i++) {
+        extInfo.count = 0;
 
-    // Enumerate available device validation layers & extensions
-    layerAndExt.InitializeDeviceLayersAndExtensions(appGpu);
-
-    /*// check for vulkan info on this GPU device
-    VkPhysicalDeviceProperties gpuProperties;
-    vkGetPhysicalDeviceProperties(appGpu, &gpuProperties);
-    InfoLog("Vulkan Physical Device Name: %s", gpuProperties.deviceName);
-    InfoLog("Vulkan Physical Device Info: apiVersion: %x \n\t driverVersion: %x",
-         gpuProperties.apiVersion, gpuProperties.driverVersion);
-    InfoLog("API Version Supported: %d.%d.%d",
-         VK_VERSION_MAJOR(gpuProperties.apiVersion),
-         VK_VERSION_MINOR(gpuProperties.apiVersion),
-         VK_VERSION_PATCH(gpuProperties.apiVersion));
-
-    VkAndroidSurfaceCreateInfoKHR createInfo {
-        .sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
-        .pNext = nullptr,
-        .flags = 0,
-        .window = app->window
-    };
-    result = vkCreateAndroidSurfaceKHR(appInstance, &createInfo, nullptr, &appSurface);
-    if (result != VK_SUCCESS) {
-        string code = to_string(result);
-        throw runtime_error("vkCreateAndroidSurfaceKHR: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
+        VK_CHECK_RESULT(vkEnumerateDeviceExtensionProperties(appGpu,
+                                                             layerAndExtension.EnabledInstanceLayerNames()[i],
+                                                             &extInfo.count,
+                                                             nullptr));
+        DebugLog("%s has %d device extension properties.",
+                 layerAndExtension.EnabledInstanceLayerNames()[i], extInfo.count);
+        if (extInfo.count) {
+            extInfo.properties.resize(extInfo.count);
+            VK_CHECK_RESULT(vkEnumerateDeviceExtensionProperties(appGpu,
+                                                                 layerAndExtension.EnabledInstanceLayerNames()[i],
+                                                                 &extInfo.count,
+                                                                 nullptr));
+            for (int i = 0; i < extInfo.count; i++) {
+                DebugLog("  Extension name: %s", extInfo.properties[i].extensionName);
+            }
+            supportedDeviceExtensions.emplace_back(extInfo);
+        }
     }
-
-    VkSurfaceCapabilitiesKHR surfaceCapabilities;
-    result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(appGpu, appSurface, &surfaceCapabilities);
-    if (result != VK_SUCCESS) {
-        string code = to_string(result);
-        throw runtime_error("vkGetPhysicalDeviceSurfaceCapabilitiesKHR: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
+    vector<string> supportedDeviceExtensionNames;
+    LayerAndExtension::PickUniqueExtensionNames(supportedDeviceExtensions, supportedDeviceExtensionNames);
+    vector<const char*> requestedDeviceExtensionNames = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+    bool enable = false;
+    for (auto name : supportedDeviceExtensionNames) {
+        if (!strcmp(name.c_str(), requestedDeviceExtensionNames[0])) {
+            enable = true;
+        }
     }
-
-    InfoLog("Vulkan Surface Capabilities:\n");
-    InfoLog("\timage count: %u - %u\n", surfaceCapabilities.minImageCount,
-         surfaceCapabilities.maxImageCount);
-    InfoLog("\tarray layers: %u\n", surfaceCapabilities.maxImageArrayLayers);
-    InfoLog("\timage size (now): %dx%d\n", surfaceCapabilities.currentExtent.width,
-         surfaceCapabilities.currentExtent.height);
-    InfoLog("\timage size (extent): %dx%d - %dx%d\n",
-         surfaceCapabilities.minImageExtent.width,
-         surfaceCapabilities.minImageExtent.height,
-         surfaceCapabilities.maxImageExtent.width,
-         surfaceCapabilities.maxImageExtent.height);
-    InfoLog("\tusage: %x\n", surfaceCapabilities.supportedUsageFlags);
-    InfoLog("\tcurrent transform: %u\n", surfaceCapabilities.currentTransform);
-    InfoLog("\tallowed transforms: %x\n", surfaceCapabilities.supportedTransforms);
-    InfoLog("\tcomposite alpha flags: %u\n", surfaceCapabilities.currentTransform);*/
+    if (!enable) {
+        Log::Error("Cannot enable %s", requestedDeviceExtensionNames[0]);
+        return;
+    }
 
     uint32_t queueFamilyCount;
     vkGetPhysicalDeviceQueueFamilyProperties(appGpu, &queueFamilyCount, nullptr);
-    assert(queueFamilyCount);
     vector<VkQueueFamilyProperties> queueFamilyProperties(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(appGpu, &queueFamilyCount, queueFamilyProperties.data());
-
     uint32_t queueFamilyIndex;
-    for (queueFamilyIndex=0; queueFamilyIndex < queueFamilyCount;
-         queueFamilyIndex++) {
+    for (queueFamilyIndex = 0; queueFamilyIndex < queueFamilyCount; queueFamilyIndex++) {
         if (queueFamilyProperties[queueFamilyIndex].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
             break;
         }
     }
     assert(queueFamilyIndex < queueFamilyCount);
 
-    // Create a logical device from GPU we picked
+
     float priorities[] = {
         1.0f,
     };
@@ -244,38 +230,32 @@ void OnInitWindow(android_app* app)
         .queueFamilyIndex = queueFamilyIndex,
         // Send nullptr for queue priority so debug extension could
         // catch the bug and call back app's debug function
-        .pQueuePriorities = priorities,
+        //.pQueuePriorities = priorities
+        .pQueuePriorities = nullptr
     };
-
+    const uint32_t deviceExtensionCount = requestedDeviceExtensionNames.size();
     VkDeviceCreateInfo deviceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
         .pNext = nullptr,
         .queueCreateInfoCount = 1,
         .pQueueCreateInfos = &queueCreateInfo,
-        .enabledLayerCount = layerAndExt.DeviceLayerCount(),
-        .ppEnabledLayerNames = static_cast<const char* const*>(layerAndExt.DeviceLayerNames()),
-        .enabledExtensionCount = layerAndExt.DeviceExtensionCount(),
-        .ppEnabledExtensionNames = static_cast<const char* const*>(layerAndExt.DeviceExtensionNames()),
+        .enabledLayerCount = layerAndExtension.EnabledInstanceLayerCount(),
+        .ppEnabledLayerNames = enabledInstanceLayerNames.data(),
+        .enabledExtensionCount = deviceExtensionCount,
+        .ppEnabledExtensionNames = requestedDeviceExtensionNames.data(),
         .pEnabledFeatures = nullptr,
     };
-
-    result = vkCreateDevice(appGpu, &deviceCreateInfo, nullptr, &appDevice);
-    if (result != VK_SUCCESS) {
-        string code = to_string(result);
-        throw runtime_error("vkCreateDevice: code[" + code + "], file[" + __FILE__ + "], line[" + to_string(__LINE__) + "]");
-    }
-    initialized = true;
+    vkCreateDevice(appGpu, &deviceCreateInfo, nullptr, &appDevice);
 }
 
 void OnTermWindow(void)
 {
     DebugLog("App OnTermWindow");
 
-    //vkDestroySurfaceKHR(appInstance, appSurface, nullptr);
-    vkDestroyDevice(appDevice, nullptr);
-    vkDestroyInstance(appInstance, nullptr);
-
-    initialized = false;
+    if (appDevice) {
+        vkDestroyDevice(appDevice, nullptr), appDevice = VK_NULL_HANDLE;
+    }
+    vkDestroyInstance(appInstance, nullptr), appInstance = VK_NULL_HANDLE;
 }
 
 void OnGainFocus(void)

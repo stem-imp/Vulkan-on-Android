@@ -1,14 +1,11 @@
-#ifndef ANDROID_LOG_HPP
-#define ANDROID_LOG_HPP
+#ifndef UTILITY_LOG_H
+#define UTILITY_LOG_H
 
 #include <string>
-#include <stdexcept>
 
 using std::string;
-using std::to_string;
-using std::runtime_error;
 
-namespace AndroidNative {
+namespace Utility {
     class Log
     {
     public:
@@ -27,6 +24,4 @@ namespace AndroidNative {
 #define DebugLog(...)
 #endif
 
-#define InfoLog(...) Log::Info(__VA_ARGS__)
-
-#endif // ANDROID_LOG_HPP
+#endif // UTILITY_LOG_H
