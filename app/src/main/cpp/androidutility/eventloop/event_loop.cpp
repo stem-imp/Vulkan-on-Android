@@ -1,13 +1,12 @@
 #include "event_loop.h"
 #include "../../log/log.h"
-#include <string>
 
 using AndroidNative::EventLoop;
 using Utility::Log;
 
-using std::to_string;
-
-EventLoop::EventLoop(android_app* app) : _application(app), _enabled(false), _quit(false)
+EventLoop::EventLoop(android_app* app) : _application(app),
+                                         _enabled(false),
+                                         _quit(false)
 {
     assert("Null android_app* parameter." && _application);
     _application->userData = this;
@@ -17,11 +16,11 @@ EventLoop::EventLoop(android_app* app) : _application(app), _enabled(false), _qu
 void EventLoop::Run()
 {
     int32_t  events;
-    android_poll_source* source;
+    android_poll_source* source = nullptr;
 
     // Calls to app_dummy are no longer necessary.
 
-    Log::Info("Starting event loop");
+    Log::Info("Starting event loop.");
     while (true) {
         while (ALooper_pollAll(_enabled ? 0 : -1, nullptr, &events, (void**)&source) >= 0) {
             if (source) {
