@@ -15,7 +15,7 @@ namespace AndroidNative {
 
         function<bool(void)> onActivate;
         function<void(void)> onDeactivate;
-        function<bool(android_app*)> onStep;
+        function<bool(void)> onStep;
 
         function<void(void)> onStart;
         function<void(void)> onResume;
