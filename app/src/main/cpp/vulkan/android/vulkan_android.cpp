@@ -19,7 +19,7 @@ void AppendInstanceExtension(std::vector<const char*>& instanceExtensionNames)
 namespace Vulkan {
 
     // ==== Surface ==== //
-    Surface::Surface(ANativeWindow *nativeWindow, const VkInstance instance) : _instance(instance)
+    Surface::Surface(ANativeWindow* nativeWindow, const VkInstance instance) : _instance(instance)
     {
         VkAndroidSurfaceCreateInfoKHR createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
