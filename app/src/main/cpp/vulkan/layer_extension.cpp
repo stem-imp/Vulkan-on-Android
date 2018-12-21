@@ -1,7 +1,6 @@
 #include "layer_extension.h"
 #include "vulkan_utility.h"
 
-// VK_LAYER_GOOGLE_unique_objects makes vkCreateAndroidSurfaceKHR to create VkSurfaceKHR with invalid value 0x1.
 const char* const LayerAndExtension::GOOGLE_UNIQUE_OBJECT_LAYER        = "VK_LAYER_GOOGLE_unique_objects";
 const char* const LayerAndExtension::GOOGLE_THREADING_LAYER            = "VK_LAYER_GOOGLE_threading";
 const char* const LayerAndExtension::LUNARG_CORE_VALIDATION_LAYER      = "VK_LAYER_LUNARG_core_validation";

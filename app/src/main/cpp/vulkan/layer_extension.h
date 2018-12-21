@@ -38,6 +38,7 @@ public:
     uint32_t EnabledInstanceLayerCount(void) const;
     uint32_t EnabledInstanceExtensionCount(void) const;
     const vector<const char*> EnabledInstanceLayerNames(void) const;
+    const vector<string>& EnabledRawInstanceLayerNames(void) const { return _instanceLayerNamesEnabled; }
     const vector<const char*> EnabledInstanceExtensionNames(void) const;
 private:
     VkInstance _instance;
