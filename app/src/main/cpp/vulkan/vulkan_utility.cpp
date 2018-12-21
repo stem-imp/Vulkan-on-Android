@@ -6,25 +6,18 @@ using Vulkan::Device;
 using std::vector;
 
 // ==== Instance ==== //
-void BuildInstance(Instance& instance, LayerAndExtension& layerAndExt, vector<const char*> instExtNames, vector<const char*> instLayerNames)
+void BuildInstance(Instance& instance, LayerAndExtension& layerAndExtension, vector<const char*> requestedInstanceExtensionNames, vector<const char*> requestedInstanceLayerNames)
 {
-    //vector<const char*> instExtNames = { VK_KHR_SURFACE_EXTENSION_NAME };
-    AppendInstanceExtension(instExtNames);
+    AppendInstanceExtension(requestedInstanceExtensionNames);
 
-    if (layerAndExt.enableValidationLayers) {
-        instExtNames.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
-
-//        vector<const char*> instLayerNames = {
-//                LayerAndExtension::GOOGLE_THREADING_LAYER,// LayerAndExtension::GOOGLE_UNIQUE_OBJECT_LAYER,
-//                LayerAndExtension::LUNARG_CORE_VALIDATION_LAYER, LayerAndExtension::LUNARG_OBJECT_TRACKER_LAYER,
-//                LayerAndExtension::LUNARG_PARAMETER_VALIDATION_LAYER
-//        };
-        layerAndExt.EnableInstanceLayers(instLayerNames);
+    if (layerAndExtension.enableValidationLayers) {
+        requestedInstanceExtensionNames.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+        layerAndExtension.EnableInstanceLayers(requestedInstanceLayerNames);
     }
-    layerAndExt.EnableInstanceExtensions(instExtNames);
-    instance.CreateInstance(layerAndExt);
-    if (layerAndExt.enableValidationLayers) {
-        if (!layerAndExt.HookDebugReportExtension(instance.GetInstance())) {
+    layerAndExtension.EnableInstanceExtensions(requestedInstanceExtensionNames);
+    instance.CreateInstance(layerAndExtension);
+    if (layerAndExtension.enableValidationLayers) {
+        if (!layerAndExtension.HookDebugReportExtension(instance.GetInstance())) {
             DebugLog("Enable debugging feature failed.");
         }
     }

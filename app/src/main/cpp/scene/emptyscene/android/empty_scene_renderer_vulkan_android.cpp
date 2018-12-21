@@ -1,4 +1,6 @@
-﻿#include "empty_scene_renderer_vulkan_android.h"
+﻿#ifdef __ANDROID__
+
+#include "empty_scene_renderer_vulkan_android.h"
 #include "../../../vulkan/renderpass/color_dst_renderpass.h"
 //#include "../../../vulkan/texture.h"
 #include "../../../vulkan/vulkan_utility.h"
@@ -199,3 +201,5 @@ void EmptySceneRenderer::RebuildSwapchainWithDependencies()
 
     CreateFramebuffers(framebuffers, *swapchain, swapchainRenderPass, *device);
 }
+
+#endif

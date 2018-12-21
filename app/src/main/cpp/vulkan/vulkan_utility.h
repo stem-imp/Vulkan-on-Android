@@ -40,11 +40,11 @@ using std::runtime_error;
 uint32_t GetAPIVersion();
 void AppendInstanceExtension(std::vector<const char*>& instanceExtensionNames);
 void BuildInstance(Instance& instance,
-                   LayerAndExtension& layerAndExt,
-                   vector<const char*> instExtNames = { VK_KHR_SURFACE_EXTENSION_NAME },
-                   vector<const char*> instLayerNames = { LayerAndExtension::GOOGLE_THREADING_LAYER, LayerAndExtension::GOOGLE_UNIQUE_OBJECT_LAYER,
-                                                          LayerAndExtension::LUNARG_CORE_VALIDATION_LAYER, LayerAndExtension::LUNARG_OBJECT_TRACKER_LAYER,
-                                                          LayerAndExtension::LUNARG_PARAMETER_VALIDATION_LAYER });
+                   LayerAndExtension&  layerAndExtension,
+                   vector<const char*> requestedInstanceExtensionNames = { VK_KHR_SURFACE_EXTENSION_NAME },
+                   vector<const char*> requestedInstanceLayerNames     = { LayerAndExtension::GOOGLE_THREADING_LAYER, LayerAndExtension::GOOGLE_UNIQUE_OBJECT_LAYER,
+                                                                           LayerAndExtension::LUNARG_CORE_VALIDATION_LAYER, LayerAndExtension::LUNARG_OBJECT_TRACKER_LAYER,
+                                                                           LayerAndExtension::LUNARG_PARAMETER_VALIDATION_LAYER });
 
 
 // ==== Device ==== //

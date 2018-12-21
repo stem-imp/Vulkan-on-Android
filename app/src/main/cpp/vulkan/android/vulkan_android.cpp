@@ -1,4 +1,6 @@
-﻿#include "../surface.h"
+﻿#ifdef __ANDROID__
+
+#include "../surface.h"
 #include "../vulkan_utility.h"
 #include "android_native_app_glue.h"
 
@@ -27,3 +29,5 @@ namespace Vulkan {
         VK_CHECK_RESULT(vkCreateAndroidSurfaceKHR(instance, &createInfo, nullptr, &_surface));
     }
 }
+
+#endif

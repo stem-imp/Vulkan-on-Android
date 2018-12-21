@@ -1,4 +1,6 @@
-﻿#include "../../renderer.h"
+﻿#ifdef __ANDROID__
+
+#include "../../renderer.h"
 
 Renderer::Renderer(void* genericWindow, uint32_t screenWidth, uint32_t screenHeight)
 {
@@ -7,3 +9,5 @@ Renderer::Renderer(void* genericWindow, uint32_t screenWidth, uint32_t screenHei
     screenSize.height = screenHeight;
     currentFrameIndex = 0;
 }
+
+#endif

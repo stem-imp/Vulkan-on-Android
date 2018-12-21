@@ -1,8 +1,8 @@
-#include "../../log/log.h"
 #include "event_loop.h"
+#include "../../log/log.h"
 
-using Utility::Log;
 using AndroidNative::EventLoop;
+using Utility::Log;
 
 EventLoop::EventLoop(android_app* app): _application(app),
                                         _enabled(false),

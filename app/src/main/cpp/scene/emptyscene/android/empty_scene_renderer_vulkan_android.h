@@ -1,4 +1,6 @@
-﻿#include "../../../renderer.h"
+﻿#ifdef __ANDROID__
+
+#include "../../../renderer.h"
 
 using Vulkan::Command;
 
@@ -18,3 +20,5 @@ private:
 
     Command::CommandBuffers _commandBuffers;
 };
+
+#endif
