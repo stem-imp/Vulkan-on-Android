@@ -1,5 +1,10 @@
 apply plugin: 'com.android.application'
 
+Properties properties = new Properties()
+properties.load(project.rootProject.file('local.properties').newDataInputStream())
+def ndkDir = properties.getProperty('ndk.dir')
+def valLayerBinDir = "${ndkDir}/sources/third_party/vulkan/src/build-android/jniLibs"
+
 android {
     compileSdkVersion 28
     defaultConfig {
@@ -19,7 +24,7 @@ android {
     }
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
@@ -28,10 +33,17 @@ android {
             path "CMakeLists.txt"
         }
     }
+    sourceSets {
+        main {
+            jniLibs {
+                // Must have ndk-r12 or better which including layer binaries
+                srcDirs = ["${valLayerBinDir}"]
+            }
+        }
+    }
 }
 
 dependencies {
-    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation 'com.android.support:appcompat-v7:28.0.0'
-    implementation project(':vulkanlayerlib')
 }

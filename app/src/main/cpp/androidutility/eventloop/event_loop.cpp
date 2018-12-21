@@ -1,12 +1,12 @@
-#include "event_loop.hpp"
-#include "log.hpp"
+#include "../../log/log.h"
+#include "event_loop.h"
 
+using Utility::Log;
 using AndroidNative::EventLoop;
 
-EventLoop::EventLoop(android_app* app):
-        _application(app),
-        _enabled(false),
-        _quit(false)
+EventLoop::EventLoop(android_app* app): _application(app),
+                                        _enabled(false),
+                                        _quit(false)
 {
     _application->userData = this;
     _application->onAppCmd = AppEvent;
@@ -15,14 +15,14 @@ EventLoop::EventLoop(android_app* app):
 void EventLoop::Run()
 {
     int32_t  events;
-    android_poll_source* source;
+    android_poll_source* source = nullptr;
 
     // Calls to app_dummy are no longer necessary.
 
-    Log::Info("Starting event loop");
+    Log::Info("Starting event loop.");
     while (true) {
         while (ALooper_pollAll(_enabled ? 0 : -1, nullptr, &events, (void**)&source) >= 0) {
-            if (source != nullptr) {
+            if (source) {
                 source->process (_application, source);
             }
             if (_application->destroyRequested) {
@@ -31,7 +31,7 @@ void EventLoop::Run()
             }
         }
         if (_enabled && !_quit) {
-            if (onStep != nullptr && onStep() != OK) {
+            if (onStep && !onStep()) {
                 _quit = true;
                 ANativeActivity_finish(_application->activity);
             }
@@ -41,10 +41,10 @@ void EventLoop::Run()
 
 void EventLoop::Activate()
 {
-    if (!_enabled && _application->window != nullptr) {
+    if (!_enabled && _application->window) {
         _quit = false;
         _enabled = true;
-        if (onActivate != nullptr && onActivate() != OK) {
+        if (onActivate != nullptr && !onActivate()) {
             goto ERROR;
         }
     }
@@ -59,7 +59,7 @@ void EventLoop::Activate()
 void EventLoop::Deactivate()
 {
     if (_enabled) {
-        if (onDeactivate != nullptr) {
+        if (onDeactivate) {
             onDeactivate();
         }
         _enabled = false;
@@ -76,66 +76,66 @@ void EventLoop::ProcessAppEvent(android_app* app, int32_t command)
 {
     switch (command) {
         case APP_CMD_START:
-            if (onStart != nullptr) {
+            if (onStart) {
                 onStart();
             }
             break;
         case APP_CMD_RESUME:
-            if (onResume != nullptr) {
+            if (onResume) {
                 onResume();
             }
             break;
         case APP_CMD_INIT_WINDOW:
-            if (onInitWindow != nullptr) {
+            if (onInitWindow) {
                 onInitWindow(app);
             }
             break;
         case APP_CMD_GAINED_FOCUS:
             Activate();
-            if (onGainFocus != nullptr) {
+            if (onGainFocus) {
                 onGainFocus();
             }
             break;
         case APP_CMD_PAUSE:
-            if (onPause != nullptr) {
+            if (onPause) {
                 onPause();
             }
             Deactivate();
             break;
         case APP_CMD_SAVE_STATE:
-            if (onSaveInstanceState != nullptr) {
+            if (onSaveInstanceState) {
                 onSaveInstanceState(&_application->savedState, &_application->savedStateSize);
             }
             break;
         case APP_CMD_STOP:
-            if (onStop != nullptr) {
+            if (onStop) {
                 onStop();
             }
             break;
         case APP_CMD_LOST_FOCUS:
-            if (onLostFocus != nullptr) {
+            if (onLostFocus) {
                 onLostFocus();
             }
             Deactivate();
             break;
         case APP_CMD_TERM_WINDOW:
-            if (onTermWindow != nullptr) {
+            if (onTermWindow) {
                 onTermWindow();
             }
             Deactivate();
             break;
         case APP_CMD_DESTROY:
-            if (onDestroy != nullptr) {
+            if (onDestroy) {
                 onDestroy();
             }
             break;
         case APP_CMD_CONFIG_CHANGED:
-            if (onConfigurationChanged != nullptr) {
+            if (onConfigurationChanged) {
                 onConfigurationChanged(app);
             }
             break;
         case APP_CMD_LOW_MEMORY:
-            if (onLowMemory != nullptr) {
+            if (onLowMemory) {
                 onLowMemory();
             }
             break;

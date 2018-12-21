@@ -1,8 +1,8 @@
-#include "log.hpp"
-#include <cstdarg>
+#include "../../log/log.h"
 #include <android/log.h>
+#include <cstdarg>
 
-using AndroidNative::Log;
+using Utility::Log;
 
 string Log::Tag = "android";
 
