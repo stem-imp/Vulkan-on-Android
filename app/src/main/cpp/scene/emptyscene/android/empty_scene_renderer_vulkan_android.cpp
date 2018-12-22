@@ -20,7 +20,7 @@ EmptySceneRenderer::EmptySceneRenderer(void* genericWindow, uint32_t screenWidth
     instance = new Instance();
     layerAndExtension = new LayerAndExtension();
     if (!BuildInstance(*instance, *layerAndExtension)) {
-        throw runtime_error("Essential layers adn extension are not available.");
+        throw runtime_error("Essential layers and extension are not available.");
     }
 
     surface = new Surface(window, instance->GetInstance());
