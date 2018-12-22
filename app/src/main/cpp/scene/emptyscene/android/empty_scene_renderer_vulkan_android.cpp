@@ -25,14 +25,10 @@ EmptySceneRenderer::EmptySceneRenderer(void* genericWindow, uint32_t screenWidth
 
     surface = new Surface(window, instance->GetInstance());
 
-    device    = new Device(SelectPhysicalDevice(*instance, *surface));
     const vector<const char*> requestedExtNames = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
-    if (!device->EnableDeviceExtensions(requestedExtNames)) {
-        throw runtime_error("Requested device extensions are not supported.");
-    }
+    device = new Device(SelectPhysicalDevice(*instance, *surface, requestedExtNames));
     VkPhysicalDeviceFeatures featuresRequested = {};
-    device->CreateDevice(featuresRequested, requestedExtNames);
-    device->GetFamilyQueues();
+    device->BuildDevice(featuresRequested, requestedExtNames);
 
     swapchain = new Swapchain(*surface, *device);
     swapchain->getScreenExtent = [&]() -> Extent2D { return screenSize; };

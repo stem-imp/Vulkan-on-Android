@@ -55,7 +55,12 @@ Device SelectPhysicalDevice(const Instance& instance, Surface& surface, vector<c
     throw runtime_error("Could not find suitable physical device.");
 }
 
-bool IsPhysicalDeviceSuitable(Device& device, VkQueueFlags queuesRequested, const vector<const char*>& deviceExtensionNamesRequested, const VkPhysicalDeviceFeatures& featuresRequested, Surface& surface)
+bool IsPhysicalDeviceSuitable(Device&                         device,
+                              VkQueueFlags                    queuesRequested,
+                              const vector<const char*>&      deviceExtensionNamesRequested,
+                              const VkPhysicalDeviceFeatures& featuresRequested,
+                              Surface&                        surface,
+                              bool                            needPresent)
 {
     // Check Requested Queues
     VkPhysicalDevice physicalDevice = device.PhysicalDevice();
@@ -83,7 +88,7 @@ bool IsPhysicalDeviceSuitable(Device& device, VkQueueFlags queuesRequested, cons
     if (queueFound != queuesRequested) {
         return false;
     }
-    if (device.FamilyQueues().present.index == -1) {
+    if (needPresent && device.FamilyQueues().present.index == -1) {
         return false;
     }
 

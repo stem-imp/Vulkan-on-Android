@@ -92,8 +92,12 @@ namespace Vulkan {
 
     Device::~Device()
     {
-        DebugLog("~Device()");
-        vkDestroyDevice(_device, nullptr);
+        if (_device) {
+            DebugLog("~Device() vkDestroyDevice");
+            vkDestroyDevice(_device, nullptr);
+        } else {
+            DebugLog("~Device()");
+        }
     }
 
     void Device::EnumerateExtensions(const vector<const char*>& instanceLayerNames)
@@ -105,8 +109,7 @@ namespace Vulkan {
         vector<ExtensionGroup> deviceExtensions;
         if (extInfo.count) {
             extInfo.properties.resize(extInfo.count);
-            VK_CHECK_RESULT(vkEnumerateDeviceExtensionProperties(_physicalDevice, nullptr, &extInfo.count,
-                                                                 extInfo.properties.data()));
+            VK_CHECK_RESULT(vkEnumerateDeviceExtensionProperties(_physicalDevice, nullptr, &extInfo.count, extInfo.properties.data()));
             deviceExtensions.emplace_back(extInfo);
         }
         size_t size = instanceLayerNames.size();
@@ -141,12 +144,12 @@ namespace Vulkan {
             if (IsDeviceExtensionSupported(extensionNames[i])) {
                 _enabledDeviceExtensionNames.push_back(static_cast<const char*>(extensionNames[i]));
             } else {
+                Log::Warn("%s is not supported.", extensionNames[i]);
                 break;
             }
         }
         bool res = (i == extensionNames.size());
         if (!res) {
-            Log::Warn("Request %d extensions but only %s are supported.", extensionNames.size(), i);
             _enabledDeviceExtensionNames.clear();
         }
         return res;
@@ -175,7 +178,7 @@ namespace Vulkan {
                 }
             }
         }
-            // Dedicated compute queue family.
+        // Dedicated compute queue family.
         else if (queueFlagBit == VK_QUEUE_COMPUTE_BIT) {
             for (uint32_t i = 0; i < static_cast<uint32_t>(_queueFamilyProperties.size()); i++) {
                 if ((_queueFamilyProperties[i].queueFlags & queueFlagBit) &&
@@ -295,8 +298,15 @@ namespace Vulkan {
         return ret;
     }
 
+    void Device::BuildDevice(const VkPhysicalDeviceFeatures& requestedFeatures,
+                             const vector<const char*>& requestedExtensions)
+    {
+        CreateDevice(requestedFeatures, requestedExtensions);
+        GetFamilyQueues();
+    }
+
     void Device::CreateDevice(const VkPhysicalDeviceFeatures& requestedFeatures,
-                              const vector<const char*> &requestedExtensions)
+                              const vector<const char*>& requestedExtensions)
     {
         vector<VkDeviceQueueCreateInfo> queueInfos = {};
         const float qeuePriority = 0.0f;

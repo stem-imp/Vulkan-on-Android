@@ -49,7 +49,12 @@ bool BuildInstance(Instance& instance,
 
 // ==== Device ==== //
 Device SelectPhysicalDevice(const Instance& instance, Surface& surface, vector<const char*> extensionNamesRequested = { VK_KHR_SWAPCHAIN_EXTENSION_NAME }, VkQueueFlags queuesRequested = (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT), VkPhysicalDeviceFeatures requestedFeatures = {});
-bool IsPhysicalDeviceSuitable(Device& device, VkQueueFlags queuesRequested, const vector<const char*>& deviceExtensionNamesRequested, const VkPhysicalDeviceFeatures& featuresRequested, Surface& surface);
+bool IsPhysicalDeviceSuitable(Device&                         device,
+                              VkQueueFlags                    queuesRequested,
+                              const vector<const char*>&      deviceExtensionNamesRequested,
+                              const VkPhysicalDeviceFeatures& featuresRequested,
+                              Surface&                        surface,
+                              bool                            needPresent = true);
 uint32_t MapMemoryTypeToIndex(VkPhysicalDevice physicalDevice, uint32_t memoryTypeBits, VkMemoryPropertyFlags requestedProperties);
 
 

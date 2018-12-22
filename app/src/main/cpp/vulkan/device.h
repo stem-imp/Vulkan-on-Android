@@ -4,9 +4,10 @@
 #ifdef __ANDROID__
 #include "vulkan_wrapper.h"
 #endif
-#include "layer_extension.h"
+#include <string>
 #include <vector>
 
+using std::string;
 using std::vector;
 
 namespace Vulkan
@@ -39,8 +40,7 @@ namespace Vulkan
         const VkPhysicalDeviceFeatures FeaturesSupported() const { return _featuresSupported; }
         void RequestSampleCount(VkSampleCountFlagBits& sampleCount);
 
-        void CreateDevice(const VkPhysicalDeviceFeatures& requestedFeatures, const vector<const char*>& requestedExtensions);
-        void GetFamilyQueues();
+        void BuildDevice(const VkPhysicalDeviceFeatures& requestedFeatures, const vector<const char*>& requestedExtensions);
 
         VkPhysicalDevice PhysicalDevice() const { return _physicalDevice; }
         VkDevice LogicalDevice() const { return _device; }
@@ -52,6 +52,8 @@ namespace Vulkan
 
         VkQueueFlags queueFlags;
     private:
+        void CreateDevice(const VkPhysicalDeviceFeatures& requestedFeatures, const vector<const char*>& requestedExtensions);
+        void GetFamilyQueues();
         VkSampleCountFlagBits GetMaxUsableSampleCount() const;
         const vector<const char*> EnabledDeviceExtensionNames() const;
 
