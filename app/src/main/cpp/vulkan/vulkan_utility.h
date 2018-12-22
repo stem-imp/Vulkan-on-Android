@@ -39,7 +39,7 @@ using std::runtime_error;
 // ==== Instance ==== //
 uint32_t GetAPIVersion();
 void AppendInstanceExtension(std::vector<const char*>& instanceExtensionNames);
-void BuildInstance(Instance& instance,
+bool BuildInstance(Instance& instance,
                    LayerAndExtension&  layerAndExtension,
                    vector<const char*> requestedInstanceExtensionNames = { VK_KHR_SURFACE_EXTENSION_NAME },
                    vector<const char*> requestedInstanceLayerNames     = { LayerAndExtension::GOOGLE_THREADING_LAYER, LayerAndExtension::GOOGLE_UNIQUE_OBJECT_LAYER,

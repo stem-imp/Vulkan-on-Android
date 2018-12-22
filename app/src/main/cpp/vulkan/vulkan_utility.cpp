@@ -6,7 +6,7 @@ using Vulkan::Device;
 using std::vector;
 
 // ==== Instance ==== //
-void BuildInstance(Instance& instance, LayerAndExtension& layerAndExtension, vector<const char*> requestedInstanceExtensionNames, vector<const char*> requestedInstanceLayerNames)
+bool BuildInstance(Instance& instance, LayerAndExtension& layerAndExtension, vector<const char*> requestedInstanceExtensionNames, vector<const char*> requestedInstanceLayerNames)
 {
     AppendInstanceExtension(requestedInstanceExtensionNames);
 
@@ -14,13 +14,16 @@ void BuildInstance(Instance& instance, LayerAndExtension& layerAndExtension, vec
         requestedInstanceExtensionNames.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
         layerAndExtension.EnableInstanceLayers(requestedInstanceLayerNames);
     }
-    layerAndExtension.EnableInstanceExtensions(requestedInstanceExtensionNames);
+    if (!layerAndExtension.EnableInstanceExtensions(requestedInstanceExtensionNames)) {
+        return false;
+    }
     instance.CreateInstance(layerAndExtension);
     if (layerAndExtension.enableValidationLayers) {
         if (!layerAndExtension.HookDebugReportExtension(instance.GetInstance())) {
             DebugLog("Enable debugging feature failed.");
         }
     }
+    return true;
 }
 
 

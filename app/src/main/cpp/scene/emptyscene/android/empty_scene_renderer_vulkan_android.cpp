@@ -19,9 +19,11 @@ EmptySceneRenderer::EmptySceneRenderer(void* genericWindow, uint32_t screenWidth
     SysInitVulkan();
     instance = new Instance();
     layerAndExtension = new LayerAndExtension();
-    BuildInstance(*instance, *layerAndExtension);
+    if (!BuildInstance(*instance, *layerAndExtension)) {
+        throw runtime_error("Essential layers adn extension are not available.");
+    }
 
-    surface   = new Surface(window, instance->GetInstance());
+    surface = new Surface(window, instance->GetInstance());
 
     device    = new Device(SelectPhysicalDevice(*instance, *surface));
     const vector<const char*> requestedExtNames = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
