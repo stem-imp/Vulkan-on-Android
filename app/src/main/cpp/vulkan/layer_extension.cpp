@@ -136,7 +136,7 @@ LayerAndExtension::~LayerAndExtension()
     }
 }
 
-bool LayerAndExtension::EnableInstanceLayers(const vector<const char *> &requestedLayerNames)
+bool LayerAndExtension::EnableInstanceLayers(const vector<const char *>& requestedLayerNames)
 {
     if (!requestedLayerNames.size() || !enableValidationLayers) {
         return false;
@@ -148,8 +148,7 @@ bool LayerAndExtension::EnableInstanceLayers(const vector<const char *> &request
         if (IsInstanceLayerSupported(requestedLayerNames[i])) {
             _instanceLayerNamesEnabled.push_back(requestedLayerNames[i]);
         } else {
-            _instanceLayerNamesEnabled.clear();
-            break;
+            Log::Warn("%s is not supported.", requestedLayerNames[i]);
         }
     }
     return (i == requestedLayerNames.size());
@@ -190,11 +189,15 @@ bool LayerAndExtension::EnableInstanceExtensions(const vector<const char*>& requ
             _instanceExtensionNamesEnabled.push_back(static_cast<char*>(requestedExtensionNames[i]));
             break;
 #else
-            break;
+            Log::Warn("%s is not supported.", requestedExtensionNames[i]);
 #endif
         }
     }
-    return (i == requestedExtensionNames.size());
+    bool result = (i == requestedExtensionNames.size());
+    if (!result) {
+        _instanceExtensionNamesEnabled.clear();
+    }
+    return result;
 }
 
 bool LayerAndExtension::IsInstanceExtensionSupported(const char* const extensionName) const
@@ -256,15 +259,15 @@ bool LayerAndExtension::HookDebugReportExtension(VkInstance instance)
     }
 
     VkDebugReportCallbackCreateInfoEXT dbgInfo = {
-            .sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT,
-            .pNext = nullptr,
-            .flags = VK_DEBUG_REPORT_INFORMATION_BIT_EXT |
-                     VK_DEBUG_REPORT_WARNING_BIT_EXT |
-                     VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
-                     VK_DEBUG_REPORT_ERROR_BIT_EXT |
-                     VK_DEBUG_REPORT_DEBUG_BIT_EXT,
-            .pfnCallback = VKDebugReportCallbackEXImplementation,
-            .pUserData = this,
+        .sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT,
+        .pNext = nullptr,
+        .flags = VK_DEBUG_REPORT_INFORMATION_BIT_EXT |
+                 VK_DEBUG_REPORT_WARNING_BIT_EXT |
+                 VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
+                 VK_DEBUG_REPORT_ERROR_BIT_EXT |
+                 VK_DEBUG_REPORT_DEBUG_BIT_EXT,
+        .pfnCallback = VKDebugReportCallbackEXImplementation,
+        .pUserData = this,
     };
     VK_CHECK_RESULT(vkCreateDebugReportCallbackEXT(instance, &dbgInfo, nullptr, &_debugReportCallbackExt));
     return true;
