@@ -28,7 +28,7 @@ public:
     LayerAndExtension(void);
     ~LayerAndExtension();
 
-    bool EnableInstanceLayers(const vector<const char *> &requestedLayerNames);
+    bool EnableInstanceLayers(const vector<const char *>& requestedLayerNames);
     bool EnableInstanceExtensions(const vector<const char*>& requestedExtensionNames);
 
     bool HookDebugReportExtension(VkInstance instance);
