@@ -1,5 +1,5 @@
-﻿#ifndef VULKAN_RENDERPASS_H
-#define VULKAN_RENDERPASS_H
+﻿#ifndef VULKAN_RENDER_PASS_H
+#define VULKAN_RENDER_PASS_H
 
 #ifdef __ANDROID__
 #include "vulkan_wrapper.h"
@@ -13,23 +13,22 @@ namespace Vulkan
 {
     class RenderPass {
     public:
-        RenderPass(const Device& device) : _device(device) {}
         virtual ~RenderPass() = 0;
 
         void CreateRenderPass();
         // Get format of VkSurfaceFormat.
         function<VkFormat(void)> getFormat;
 
-        const VkRenderPass GetRenderPass() const { return _renderPass; }
+        VkRenderPass GetRenderPass() const { return _renderPass; }
     protected:
+        RenderPass(const Device& device) : _device(device) {}
 
         // Base Variables
         VkRenderPass _renderPass;
         const Device& _device;
-        VkFormat _format;
     private:
         virtual void CreateRenderPassImpl() = 0;
     };
 }
 
-#endif // VULKAN_RENDERPASS_H
+#endif // VULKAN_RENDER_PASS_H
