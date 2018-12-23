@@ -16,7 +16,7 @@ Swapchain::~Swapchain()
     if (_swapchain != VK_NULL_HANDLE) {
         DebugLog("~Swapchain() vkDestroySwapchainKHR()");
         VkDevice device = _device.LogicalDevice();
-        for (uint32_t i = 0; i < _swapChainImagesCount; i++) {
+        for (uint32_t i = 0; i < _imageViews.size(); i++) {
             vkDestroyImageView(device, _imageViews[i], nullptr);
         }
         _imageViews.clear();
@@ -33,7 +33,7 @@ void Swapchain::CreateSwapChain()
     const Surface& surface = _surface;
     const Device& device = _device;
     Vulkan::Surface::SurfaceSupportInfo supportInfo = surface.QuerySurfaceSupport(device.PhysicalDevice());
-    _surfaceFormat = ChooseSwapSurfaceFormat(supportInfo.formats);
+    _surfaceFormat = ChooseSurfaceFormat(supportInfo.formats);
     VkPresentModeKHR presentMode = ChooseSwapchainPresentMode(supportInfo.presentModes, supportInfo.capabilities);
     assert(getScreenExtent);
     Extent2D viewportSize = getScreenExtent();
@@ -91,7 +91,6 @@ void Swapchain::CreateSwapChain()
     }
 
     swapchainCreateInfo.pQueueFamilyIndices = (uint32_t*)&_graphics.index;
-    Log::Info("supportedTransforms: %d", supportInfo.capabilities.supportedTransforms);
     if (supportInfo.capabilities.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) {
         swapchainCreateInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
     } else {
@@ -131,13 +130,13 @@ void Swapchain::CreateSwapChain()
 void Swapchain::CreateImageViews(uint32_t baseArrayLayer, uint32_t layerCount)
 {
     const Device& device = _device;
-    _swapChainImagesCount = 0;
-    VK_CHECK_RESULT(vkGetSwapchainImagesKHR(device.LogicalDevice(), _swapchain, &_swapChainImagesCount, nullptr));
-    _images.resize(_swapChainImagesCount);
-    VK_CHECK_RESULT(vkGetSwapchainImagesKHR(device.LogicalDevice(), _swapchain, &_swapChainImagesCount, _images.data()));
+    uint32_t swapChainImagesCount = 0;
+    VK_CHECK_RESULT(vkGetSwapchainImagesKHR(device.LogicalDevice(), _swapchain, &swapChainImagesCount, nullptr));
+    _images.resize(swapChainImagesCount);
+    VK_CHECK_RESULT(vkGetSwapchainImagesKHR(device.LogicalDevice(), _swapchain, &swapChainImagesCount, _images.data()));
 
-    _imageViews.resize(_swapChainImagesCount);
-    for (uint32_t i = 0; i < _swapChainImagesCount; i++) {
+    _imageViews.resize(swapChainImagesCount);
+    for (uint32_t i = 0; i < swapChainImagesCount; i++) {
         _imageViews[i] = CreateImageView(_images[i],
                                          VK_IMAGE_VIEW_TYPE_2D,
                                          _surfaceFormat.format,

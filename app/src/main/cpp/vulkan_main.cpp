@@ -386,7 +386,7 @@
 //    }
 //}
 //
-//VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const vector<VkSurfaceFormatKHR>& availableFormats, VkFormat targetFormat, VkColorSpaceKHR targetColorSpace)
+//VkSurfaceFormatKHR ChooseSurfaceFormat(const vector<VkSurfaceFormatKHR>& availableFormats, VkFormat targetFormat, VkColorSpaceKHR targetColorSpace)
 //{
 //    if (availableFormats.size() == 1 && availableFormats[0].format == VK_FORMAT_UNDEFINED) {
 //        return { VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
@@ -434,7 +434,7 @@
 //{
 //    const DeviceInfo& deviceInfo = instanceInfo.devices[0];
 //    SwapchainSupportInfo supportInfo = QuerySwapchainSupport(deviceInfo.physicalDevice, instanceInfo.surface);
-//    VkSurfaceFormatKHR surfaceFormat = ChooseSwapSurfaceFormat(supportInfo.formats, VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR);
+//    VkSurfaceFormatKHR surfaceFormat = ChooseSurfaceFormat(supportInfo.formats, VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR);
 //    VkPresentModeKHR presentMode = ChooseSwapchainPresentMode(supportInfo.presentModes);
 //    VkExtent2D extent = ChooseSwapExtent(supportInfo.capabilities, instanceInfo);
 //

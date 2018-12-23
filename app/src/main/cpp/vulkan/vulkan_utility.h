@@ -59,9 +59,19 @@ uint32_t MapMemoryTypeToIndex(VkPhysicalDevice physicalDevice, uint32_t memoryTy
 
 
 // ==== Swapchain ==== //
-VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const vector<VkSurfaceFormatKHR>& formatsSupported);
+VkSurfaceFormatKHR ChooseSurfaceFormat(const vector<VkSurfaceFormatKHR>& formatsSupported,
+                                       const vector<VkSurfaceFormatKHR> preferredFormats = {
+                                               {VK_FORMAT_R8G8B8A8_UNORM,
+                                                VK_COLOR_SPACE_SRGB_NONLINEAR_KHR},
+                                               {VK_FORMAT_B8G8R8A8_UNORM,
+                                                VK_COLOR_SPACE_SRGB_NONLINEAR_KHR},
+                                               {VK_FORMAT_R8G8B8A8_SRGB,
+                                                VK_COLOR_SPACE_SRGB_NONLINEAR_KHR},
+                                               {VK_FORMAT_B8G8R8A8_SRGB,
+                                                VK_COLOR_SPACE_SRGB_NONLINEAR_KHR}
+                                       });
 VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, uint32_t width, uint32_t height);
-VkPresentModeKHR ChooseSwapchainPresentMode(const vector<VkPresentModeKHR>& availablePresentModes, const VkSurfaceCapabilitiesKHR& surfaceCapabilities);
+VkPresentModeKHR ChooseSwapchainPresentMode(const vector<VkPresentModeKHR>& availablePresentModes, const VkSurfaceCapabilitiesKHR& surfaceCapabilities, bool vSync = false);
 void BuildSwapchain(Vulkan::Swapchain& swapchain);
 VkResult QueuePresent(const VkSwapchainKHR* pSwapchains,
                       const uint32_t*       pImageIndices,

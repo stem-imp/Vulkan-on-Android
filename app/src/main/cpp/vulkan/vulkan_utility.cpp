@@ -190,20 +190,27 @@ uint32_t MapMemoryTypeToIndex(VkPhysicalDevice physicalDevice, uint32_t memoryTy
 
 
 // ==== Swapchain ==== //
-VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const vector<VkSurfaceFormatKHR>& formatsSupported)
+VkSurfaceFormatKHR ChooseSurfaceFormat(const vector<VkSurfaceFormatKHR>& formatsSupported,
+                                       const vector<VkSurfaceFormatKHR> preferredFormats)
 {
     if (formatsSupported.size() == 1 && formatsSupported[0].format == VK_FORMAT_UNDEFINED) {
-        return { VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
+        assert(preferredFormats.size());
+        return preferredFormats[0];
     }
 
-    for (const auto& availableFormat : formatsSupported) {
-        if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-            return availableFormat;
+    for (const auto& preferredFormat : preferredFormats) {
+        for (const auto& availableFormat : formatsSupported) {
+            if (availableFormat.format == preferredFormat.format &&
+                availableFormat.colorSpace == preferredFormat.colorSpace) {
+                return availableFormat;
+            }
         }
     }
-    for (const auto& availableFormat : formatsSupported) {
-        if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM) {
-            return availableFormat;
+    for (const auto& preferredFormat : preferredFormats) {
+        for (const auto& availableFormat : formatsSupported) {
+            if (availableFormat.format == preferredFormat.format) {
+                return availableFormat;
+            }
         }
     }
 
@@ -224,11 +231,10 @@ VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, uint32
     }
 }
 
-VkPresentModeKHR ChooseSwapchainPresentMode(const vector<VkPresentModeKHR>& availablePresentModes, const VkSurfaceCapabilitiesKHR& surfaceCapabilities)
+VkPresentModeKHR ChooseSwapchainPresentMode(const vector<VkPresentModeKHR>& availablePresentModes, const VkSurfaceCapabilitiesKHR& surfaceCapabilities, bool vSync)
 {
     VkPresentModeKHR bestMode = VK_PRESENT_MODE_FIFO_KHR;
 
-    bool vSync = false; // Would be changed by config.
     if (!vSync) {
         // Choose mode of mailbox, fifo relaxed, immediate mode(in order).
         bool triBufferingCapable = surfaceCapabilities.maxImageCount >= 3 || surfaceCapabilities.maxImageCount == 0;

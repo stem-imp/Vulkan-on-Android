@@ -55,7 +55,6 @@ namespace Vulkan
         VkExtent2D          _extent2D;
         VkSurfaceFormatKHR  _surfaceFormat;
         uint32_t            _concurrentFramesCount;
-        uint32_t            _swapChainImagesCount;
         vector<VkImage>     _images;
         vector<VkImageView> _imageViews;
     };
