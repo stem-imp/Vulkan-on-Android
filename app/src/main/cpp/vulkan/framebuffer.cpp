@@ -42,7 +42,7 @@ namespace Vulkan
                                                        framebuffer._device.LogicalDevice());
     }
 
-    bool Framebuffer::CreateSwapchainFramebuffer(VkRenderPass               renderPass,
+    void Framebuffer::CreateSwapchainFramebuffer(VkRenderPass               renderPass,
                                                  const vector<VkImageView>& attachments,
                                                  const VkExtent2D&          extent2D,
 
@@ -52,6 +52,14 @@ namespace Vulkan
         _width            = extent2D.width;
         _height           = extent2D.height;
         CreateFrameBuffer(*this, renderPass, attachments, layers);
-        return true;
+    }
+
+    void Framebuffer::ReleaseFramebuffer()
+    {
+        if (_framebuffer) {
+            vkDestroyFramebuffer(_device.LogicalDevice(), _framebuffer, nullptr);
+            _framebuffer = VK_NULL_HANDLE;
+            _renderPass = VK_NULL_HANDLE;
+        }
     }
 }

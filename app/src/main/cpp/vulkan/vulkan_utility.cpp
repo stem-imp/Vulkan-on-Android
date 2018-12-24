@@ -321,7 +321,7 @@ void CreateFramebuffers(vector<Framebuffer>& framebuffers,const Swapchain& swapc
     framebuffers.clear();
     for (int i = 0; i < swapchainSize; i++) {
         framebuffers.emplace_back(device);
-        const vector<VkImageView> individuals = {imageViews[i]};
+        const vector<VkImageView> individuals = { imageViews[i] };
         framebuffers[i].CreateSwapchainFramebuffer(renderPass->GetRenderPass(), individuals, swapchain.Extent());
     }
 }

@@ -25,11 +25,13 @@ namespace Vulkan {
 
                                       uint32_t                   layers = 1);
 
-        bool CreateSwapchainFramebuffer(VkRenderPass               renderPass,
+        void CreateSwapchainFramebuffer(VkRenderPass               renderPass,
                                         const vector<VkImageView>& attachments,
                                         const VkExtent2D&          extent2D,
 
                                         uint32_t                   layers = 1);
+
+        void ReleaseFramebuffer();
 
         const VkFramebuffer GetFramebuffer() const { return _framebuffer; }
 
