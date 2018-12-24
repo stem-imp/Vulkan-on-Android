@@ -110,7 +110,7 @@ void EmptySceneRenderer::BuildCommandBuffers()
     const VkDevice d = device->LogicalDevice();
     size_t size = swapchain->ImageViews().size();
     for (int i = 0; i < size; i++) {
-        Command::BeginCommandBuffer(_commandBuffers.buffers[i], VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, d);
+        Command::BeginCommandBuffer(_commandBuffers.buffers[i], VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
         VkRenderPassBeginInfo renderPassBeginInfo = {};
         renderPassBeginInfo.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         renderPassBeginInfo.renderPass        = swapchainRenderPass->GetRenderPass();

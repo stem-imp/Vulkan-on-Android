@@ -20,10 +20,8 @@ namespace Vulkan
 
         static void BeginCommandBuffer(VkCommandBuffer           commandBuffer,
                                        VkCommandBufferUsageFlags flags,
-                                       VkDevice                  device,
 
                                        const VkCommandBufferInheritanceInfo* pInheritanceInfo = nullptr,
-                                       const void*                           pCreateNext      = nullptr,
                                        const void*                           pBeginNext       = nullptr);
 
         static vector<VkCommandBuffer> CreateAndBeginCommandBuffers(VkCommandPool commandPool,
@@ -121,68 +119,68 @@ namespace Vulkan
             }
         }
 
-        vector<VkCommandBuffer>& GeneralGraphcisCommands() { return _generalPool.graphicsCmds; }
-        vector<VkCommandBuffer>& GeneralComputeCommands()
-        {
-            if (_generalPool.compute) {
-                return _generalPool.computeCmds;
-            } else if (_generalPool.computeQueueIndex != -1) {
-                return _generalPool.graphicsCmds;
-            } else {
-                assert("No general compute commands." && false);
-            }
-        }
-        vector<VkCommandBuffer>& GeneralTransferCommands()
-        {
-            if (_generalPool.transfer) {
-                return _generalPool.transferCmds;
-            } else if (_generalPool.transferQueueIndex != -1) {
-                return _generalPool.graphicsCmds;
-            } else {
-                assert("No general compute commands." && false);
-            }
-        }
-        vector<VkCommandBuffer>& GeneralSparseBindingCommands()
-        {
-            if (_generalPool.sparseBinding) {
-                return _generalPool.sparseBindingCmds;
-            } else if (_generalPool.sparseBindingQueueIndex != -1) {
-                return _generalPool.graphicsCmds;
-            } else {
-                assert("No general sparse binding commands." && false);
-            }
-        }
-        vector<VkCommandBuffer>& ShortLivedGraphcisCommands() { return _shortLivedPool.graphicsCmds; }
-        vector<VkCommandBuffer>& ShortLivedComputeCommands()
-        {
-            if (_shortLivedPool.compute) {
-                return _shortLivedPool.computeCmds;
-            } else if (_shortLivedPool.computeQueueIndex != -1) {
-                return _shortLivedPool.graphicsCmds;
-            } else {
-                assert("No short-lived compute commands." && false);
-            }
-        }
-        vector<VkCommandBuffer>& ShortLivedTransferCommands()
-        {
-            if (_shortLivedPool.transfer) {
-                return _shortLivedPool.transferCmds;
-            } else if (_shortLivedPool.transferQueueIndex != -1) {
-                return _shortLivedPool.graphicsCmds;
-            } else {
-                assert("No short-lived transfer commands." && false);
-            }
-        }
-        vector<VkCommandBuffer>& ShortLivedSparseBindingCommands()
-        {
-            if (_shortLivedPool.sparseBinding) {
-                return _shortLivedPool.sparseBindingCmds;
-            } else if (_shortLivedPool.sparseBindingQueueIndex != -1) {
-                return _shortLivedPool.graphicsCmds;
-            } else {
-                assert("No short-lived sparse binding commands." && false);
-            }
-        }
+//        vector<VkCommandBuffer>& GeneralGraphcisCommands() { return _generalPool.graphicsCmds; }
+//        vector<VkCommandBuffer>& GeneralComputeCommands()
+//        {
+//            if (_generalPool.compute) {
+//                return _generalPool.computeCmds;
+//            } else if (_generalPool.computeQueueIndex != -1) {
+//                return _generalPool.graphicsCmds;
+//            } else {
+//                assert("No general compute commands." && false);
+//            }
+//        }
+//        vector<VkCommandBuffer>& GeneralTransferCommands()
+//        {
+//            if (_generalPool.transfer) {
+//                return _generalPool.transferCmds;
+//            } else if (_generalPool.transferQueueIndex != -1) {
+//                return _generalPool.graphicsCmds;
+//            } else {
+//                assert("No general compute commands." && false);
+//            }
+//        }
+//        vector<VkCommandBuffer>& GeneralSparseBindingCommands()
+//        {
+//            if (_generalPool.sparseBinding) {
+//                return _generalPool.sparseBindingCmds;
+//            } else if (_generalPool.sparseBindingQueueIndex != -1) {
+//                return _generalPool.graphicsCmds;
+//            } else {
+//                assert("No general sparse binding commands." && false);
+//            }
+//        }
+//        vector<VkCommandBuffer>& ShortLivedGraphcisCommands() { return _shortLivedPool.graphicsCmds; }
+//        vector<VkCommandBuffer>& ShortLivedComputeCommands()
+//        {
+//            if (_shortLivedPool.compute) {
+//                return _shortLivedPool.computeCmds;
+//            } else if (_shortLivedPool.computeQueueIndex != -1) {
+//                return _shortLivedPool.graphicsCmds;
+//            } else {
+//                assert("No short-lived compute commands." && false);
+//            }
+//        }
+//        vector<VkCommandBuffer>& ShortLivedTransferCommands()
+//        {
+//            if (_shortLivedPool.transfer) {
+//                return _shortLivedPool.transferCmds;
+//            } else if (_shortLivedPool.transferQueueIndex != -1) {
+//                return _shortLivedPool.graphicsCmds;
+//            } else {
+//                assert("No short-lived transfer commands." && false);
+//            }
+//        }
+//        vector<VkCommandBuffer>& ShortLivedSparseBindingCommands()
+//        {
+//            if (_shortLivedPool.sparseBinding) {
+//                return _shortLivedPool.sparseBindingCmds;
+//            } else if (_shortLivedPool.sparseBindingQueueIndex != -1) {
+//                return _shortLivedPool.graphicsCmds;
+//            } else {
+//                assert("No short-lived sparse binding commands." && false);
+//            }
+//        }
 
     private:
         void CreateCommandPool(VkCommandPoolCreateFlags poolFlags, VkQueueFlags queueFlags, const Vulkan::Device& device);

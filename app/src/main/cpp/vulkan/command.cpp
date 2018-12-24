@@ -121,10 +121,8 @@ vector<VkCommandBuffer> Command::CreateCommandBuffers(VkCommandPool commandPool,
 
 void Command::BeginCommandBuffer(VkCommandBuffer           commandBuffer,
                                  VkCommandBufferUsageFlags flags,
-                                 VkDevice                  device,
 
                                  const VkCommandBufferInheritanceInfo* pInheritanceInfo,
-                                 const void*                           pCreateNext,
                                  const void*                           pBeginNext)
 {
     VkCommandBufferBeginInfo beginInfo = {};
