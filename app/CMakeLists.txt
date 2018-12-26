@@ -24,51 +24,49 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
 # You can define multiple libraries, and CMake builds them for you.
 # Gradle automatically packages shared libraries with your APK.
 
-add_library( # Sets the name of the library.
-        log-cpp
-
-        # Sets the library as a shared library.
-        SHARED
-
-        # Provides a relative path to your source file(s).
-        src/main/cpp/log.cpp )
+# android-utility-cpp-lib
+add_library(android-utility-cpp-lib SHARED
+        src/main/cpp/androidutility/log/log_android.cpp
+        src/main/cpp/androidutility/eventloop/event_loop.cpp)
 
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by
 # default, you only need to specify the name of the public NDK library
 # you want to add. CMake verifies that the library exists before
 # completing its build.
-
 find_library( # Sets the name of the path variable.
         log-lib
 
         # Specifies the name of the NDK library that
         # you want CMake to locate.
-        log )
+        log)
 
 target_link_libraries( # Specifies the target library.
-        log-cpp
+        android-utility-cpp-lib android
 
         # Links the target library to the log library
         # included in the NDK.
         ${log-lib} )
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/main/glm)
-add_definitions("-DGLM_FORCE_SIZE_T_LENGTH -DGLM_FORCE_RADIANS -DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_LANG_STL11_FORCED")
-
-# Import the CMakeLists.txt for the glm library
-add_subdirectory(src/main/glm)
-
-add_definitions("-DTINYOBJLOADER_IMPLEMENTATION")
-
-set(VULKAN_INCLUDE_DIR ${ANDROID_NDK}/sources/third_party/vulkan/src/include)
-set(VULKAN_COMMON_DIR ${ANDROID_NDK}/sources/third_party/vulkan/src/common)
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_DEBUG_EXTENTIONS -DVK_USE_PLATFORM_ANDROID_KHR")
+# vulkan
 add_definitions("-DUSE_DEBUG_EXTENTIONS")
 add_definitions("-DVK_USE_PLATFORM_ANDROID_KHR")
-add_definitions("-DSTB_IMAGE_IMPLEMENTATION")
-include_directories(${VULKAN_INCLUDE_DIR})
+include_directories(${ANDROID_NDK}/sources/third_party/vulkan/src/include)
+set(VULKAN_COMMON_DIR ${ANDROID_NDK}/sources/third_party/vulkan/src/common)
 include_directories(${VULKAN_COMMON_DIR})
+
+# glm
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+add_definitions("-DGLM_FORCE_SIZE_T_LENGTH -DGLM_FORCE_RADIANS -DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_LANG_STL11_FORCED")
+add_subdirectory(include/glm)
+
+# stb_image
+add_definitions("-DSTBI_ONLY_PNG")
+
+add_library(assimp-lib SHARED IMPORTED)
+set_target_properties(assimp-lib PROPERTIES IMPORTED_LOCATION ${CMAKE_SOURCE_DIR}/libs/${ANDROID_ABI}/libassimp.so)
+add_library(android_jniiosystem-lib SHARED IMPORTED)
+set_target_properties(android_jniiosystem-lib PROPERTIES IMPORTED_LOCATION ${CMAKE_SOURCE_DIR}/libs/${ANDROID_ABI}/libandroid_jniiosystem.a)
 
 add_library( # Sets the name of the library.
         main
@@ -78,19 +76,37 @@ add_library( # Sets the name of the library.
 
         # Provides a relative path to your source file(s).
         ${VULKAN_COMMON_DIR}/vulkan_wrapper.cpp
-        src/main/cpp/layer_extension.cpp
+
+        src/main/cpp/vulkan/layer_extension.cpp
+        src/main/cpp/vulkan/instance.cpp
+        src/main/cpp/vulkan/surface.cpp
+        src/main/cpp/vulkan/device.cpp
+        src/main/cpp/vulkan/swapchain.cpp
+        src/main/cpp/vulkan/renderpass/renderpass.cpp
+        src/main/cpp/vulkan/renderpass/color_dst_renderpass.cpp
+        src/main/cpp/vulkan/framebuffer.cpp
+        src/main/cpp/vulkan/command.cpp
+
+        src/main/cpp/vulkan/android/vulkan_android.cpp
+        src/main/cpp/vulkan/vulkan_utility.cpp
+        src/main/cpp/vulkan/android/renderer_vulkan_android.cpp
+
         src/main/cpp/vulkan_main.cpp
-        src/main/cpp/event_loop.cpp
+        src/main/cpp/scene/emptyscene/android/empty_scene_renderer_vulkan_android.cpp
+        src/main/cpp/scene/emptyscene/android/empty_scene_android.cpp
+        src/main/cpp/scene/scene.cpp
         src/main/cpp/main.cpp )
 
 # Specifies libraries CMake should link to your target library. You
 # can link multiple libraries, such as libraries you define in this
 # build script, prebuilt third-party libraries, or system libraries.
-
 target_link_libraries( # Specifies the target library.
         main
-        log-cpp
+
         android
-        native_app_glue )
+        android-utility-cpp-lib
+        native_app_glue
+        assimp-lib
+        android_jniiosystem-lib )
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_clone}")

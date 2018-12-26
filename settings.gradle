@@ -1,1 +1,1 @@
-include ':app', ':layerlib'
+include ':app'
