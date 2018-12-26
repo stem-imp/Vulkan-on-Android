@@ -13,10 +13,11 @@ public:
     void RenderImpl() override;
 
     // ==== Vulkan ==== //
-    void RebuildSwapchainWithDependencies();
+    //void RebuildSwapchainWithDependencies();
+    void RebuildSwapchain();
 
 private:
-    void BuildCommandBuffers();
+    void BuildCommandBuffer(int index);
 
     Command::CommandBuffers _commandBuffers;
 };

@@ -5,6 +5,7 @@
 //#include "../../../vulkan/texture.h"
 #include "../../../vulkan/vulkan_utility.h"
 #include "../../../vulkan/vulkan_workflow.h"
+#include <unordered_map>
 
 using Vulkan::Instance;
 using Vulkan::Surface;
@@ -13,6 +14,10 @@ using Vulkan::Swapchain;
 using Vulkan::RenderPass;
 using Vulkan::ColorDestinationRenderPass;
 using Vulkan::Command;
+using std::unordered_map;
+
+static unordered_map<int, int> currentFrameToImageindex;
+static unordered_map<int, int> imageIndexToCurrentFrame;
 
 EmptySceneRenderer::EmptySceneRenderer(void* genericWindow, uint32_t screenWidth, uint32_t screenheight) : Renderer(genericWindow, screenWidth, screenheight)
 {
@@ -38,24 +43,29 @@ EmptySceneRenderer::EmptySceneRenderer(void* genericWindow, uint32_t screenWidth
     BuildRenderPass<ColorDestinationRenderPass>(swapchainRenderPass, *swapchain, *device);
     renderPasses.push_back(swapchainRenderPass);
 
-    CreateFramebuffers(framebuffers, *swapchain, swapchainRenderPass, *device);
+    int size = swapchain->ImageViews().size();
+    for (int i = 0 ; i < size; i++) {
+        framebuffers.push_back(*device);
+    }
 
     command = new Command();
     command->BuildCommandPools(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, *device);
 
     const VkDevice d = device->LogicalDevice();
 
-    size_t size = swapchain->ImageViews().size();
-    _commandBuffers.buffers = Command::CreateCommandBuffers(command->GeneralGraphcisPool(),
-                                                            VK_COMMAND_BUFFER_LEVEL_PRIMARY, size,
+    _commandBuffers.buffers = Command::CreateCommandBuffers(command->ShortLivedGraphcisPool(),
+                                                            VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+                                                            size,
                                                             d);
 
     size_t concurrentFramesCount = swapchain->ConcurrentFramesCount();
     multiFrameFences.resize(concurrentFramesCount);
     imageAvailableSemaphores.resize(concurrentFramesCount);
+    commandsCompleteSemaphores.resize(concurrentFramesCount);
     for (int i = 0; i < concurrentFramesCount; i++) {
-        multiFrameFences[i]          = CreateFence(d, 0);
-        imageAvailableSemaphores[i]  = CreateSemaphore(d);
+        multiFrameFences[i]           = CreateFence(d);
+        imageAvailableSemaphores[i]   = CreateSemaphore(d);
+        commandsCompleteSemaphores[i] = CreateSemaphore(d);
     }
 
 //    Vulkan::Texture::defaultTransitionImageLayout = [=](VkPipelineStageFlags sourceStage,
@@ -85,6 +95,7 @@ EmptySceneRenderer::~EmptySceneRenderer()
     for (int i = 0; i < swapchain->ConcurrentFramesCount(); i++) {
         vkDestroyFence(d, multiFrameFences[i], nullptr);
         vkDestroySemaphore(d, imageAvailableSemaphores[i], nullptr);
+        vkDestroySemaphore(d, commandsCompleteSemaphores[i], nullptr);
     }
 
     delete command, command = nullptr;
@@ -104,27 +115,24 @@ EmptySceneRenderer::~EmptySceneRenderer()
     delete instance         , instance          = nullptr;
 }
 
-void EmptySceneRenderer::BuildCommandBuffers()
+
+void EmptySceneRenderer::BuildCommandBuffer(int index)
 {
     RenderPass* swapchainRenderPass = renderPasses[0];
-    const VkDevice d = device->LogicalDevice();
-    size_t size = swapchain->ImageViews().size();
-    for (int i = 0; i < size; i++) {
-        Command::BeginCommandBuffer(_commandBuffers.buffers[i], VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-        VkRenderPassBeginInfo renderPassBeginInfo = {};
-        renderPassBeginInfo.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassBeginInfo.renderPass        = swapchainRenderPass->GetRenderPass();
-        renderPassBeginInfo.framebuffer       = framebuffers[i].GetFramebuffer();
-        renderPassBeginInfo.renderArea.offset = { 0, 0 };
-        renderPassBeginInfo.renderArea.extent = swapchain->Extent();
-        renderPassBeginInfo.clearValueCount   = 1;
-        VkClearValue clearValue;
-        clearValue.color = { 0.125f, 0.75f, 1.0f, 1.0f };
-        renderPassBeginInfo.pClearValues      = &clearValue;
-        vkCmdBeginRenderPass(_commandBuffers.buffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-        vkCmdEndRenderPass(_commandBuffers.buffers[i]);
-        VK_CHECK_RESULT(vkEndCommandBuffer(_commandBuffers.buffers[i]));
-    }
+    Command::BeginCommandBuffer(_commandBuffers.buffers[index], VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    VkRenderPassBeginInfo renderPassBeginInfo = {};
+    renderPassBeginInfo.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassBeginInfo.renderPass        = swapchainRenderPass->GetRenderPass();
+    renderPassBeginInfo.framebuffer       = framebuffers[index].GetFramebuffer();
+    renderPassBeginInfo.renderArea.offset = { 0, 0 };
+    renderPassBeginInfo.renderArea.extent = swapchain->Extent();
+    renderPassBeginInfo.clearValueCount   = 1;
+    VkClearValue clearValue;
+    clearValue.color = { 0.125f, 0.75f, 1.0f, 1.0f };
+    renderPassBeginInfo.pClearValues      = &clearValue;
+    vkCmdBeginRenderPass(_commandBuffers.buffers[index], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdEndRenderPass(_commandBuffers.buffers[index]);
+    VK_CHECK_RESULT(vkEndCommandBuffer(_commandBuffers.buffers[index]));
 }
 
 void EmptySceneRenderer::RenderImpl()
@@ -132,7 +140,8 @@ void EmptySceneRenderer::RenderImpl()
     if (!device->SharedGraphicsAndPresentQueueFamily()) {
         return;
     }
-    if (orientationChanged) {
+
+    /*if (orientationChanged) {
         DebugLog("Orientation changed.");
         orientationChanged = false;
         RebuildSwapchainWithDependencies();
@@ -141,7 +150,10 @@ void EmptySceneRenderer::RenderImpl()
 
     VkDevice d = device->LogicalDevice();
 
-    BuildCommandBuffers();
+    vkWaitForFences(d, 1, &multiFrameFences[currentFrameIndex], true, UINT64_MAX);
+    vkResetFences(d, 1, &multiFrameFences[currentFrameIndex]);
+    vkResetCommandBuffer(_commandBuffers.buffers[currentFrameIndex], 0);
+    BuildCommandBuffer(currentFrameIndex);
 
     uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(d, swapchain->GetSwapchain(), UINT64_MAX, imageAvailableSemaphores[currentFrameIndex], VK_NULL_HANDLE, &imageIndex);
@@ -150,6 +162,60 @@ void EmptySceneRenderer::RenderImpl()
         RebuildSwapchainWithDependencies();
         return;
     }
+    //DebugLog("%d %d", imageIndex, currentFrameIndex);
+
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = &imageAvailableSemaphores[currentFrameIndex];
+    VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+    submitInfo.pWaitDstStageMask = waitStages;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &_commandBuffers.buffers[currentFrameIndex];
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = &commandsCompleteSemaphores[currentFrameIndex];
+    VK_CHECK_RESULT(vkQueueSubmit(device->FamilyQueues().graphics.queue, 1, &submitInfo, multiFrameFences[currentFrameIndex]));
+
+    result = QueuePresent(&swapchain->GetSwapchain(), &imageIndex, *device, 1, &commandsCompleteSemaphores[currentFrameIndex]);
+    if (result != VK_SUCCESS) {
+        DebugLog("vkQueuePresentKHR: %d", result);
+        RebuildSwapchainWithDependencies();
+        return;
+    }*/
+
+    if (orientationChanged) {
+        DebugLog("Orientation changed.");
+        orientationChanged = false;
+        RebuildSwapchain();
+        return;
+    }
+
+    VkDevice d = device->LogicalDevice();
+
+    vkWaitForFences(d, 1, &multiFrameFences[currentFrameIndex], true, UINT64_MAX);
+    vkResetFences(d, 1, &multiFrameFences[currentFrameIndex]);
+    if (currentFrameToImageindex.count(currentFrameIndex) > 0) {
+        framebuffers[currentFrameToImageindex[currentFrameIndex]].ReleaseFramebuffer();
+        currentFrameToImageindex.erase(currentFrameIndex);
+    }
+
+    uint32_t imageIndex;
+    vkAcquireNextImageKHR(d, swapchain->GetSwapchain(), UINT64_MAX, imageAvailableSemaphores[currentFrameIndex], VK_NULL_HANDLE, &imageIndex);
+    if (imageIndexToCurrentFrame.count(imageIndex) > 0) {
+        vkWaitForFences(d, 1, &multiFrameFences[imageIndexToCurrentFrame[imageIndex]], true, UINT64_MAX);
+        vkResetFences(d, 1, &multiFrameFences[imageIndexToCurrentFrame[imageIndex]]);
+        framebuffers[imageIndex].ReleaseFramebuffer();
+        currentFrameToImageindex.erase(imageIndexToCurrentFrame[imageIndex]);
+        imageIndexToCurrentFrame.erase(imageIndex);
+    }
+
+    vector<VkImageView> attachments = { swapchain->ImageViews()[imageIndex] };
+    Extent2D e = swapchain->getScreenExtent();
+    framebuffers[imageIndex].CreateSwapchainFramebuffer(renderPasses[0]->GetRenderPass(), attachments, { e.width, e.height });
+    currentFrameToImageindex[currentFrameIndex] = imageIndex;
+    imageIndexToCurrentFrame[imageIndex] = currentFrameIndex;
+
+    BuildCommandBuffer(imageIndex);
 
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -159,23 +225,16 @@ void EmptySceneRenderer::RenderImpl()
     submitInfo.pWaitDstStageMask = waitStages;
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &_commandBuffers.buffers[imageIndex];
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = &commandsCompleteSemaphores[currentFrameIndex];
     VK_CHECK_RESULT(vkQueueSubmit(device->FamilyQueues().graphics.queue, 1, &submitInfo, multiFrameFences[currentFrameIndex]));
 
-    vkWaitForFences(d, 1, &multiFrameFences[currentFrameIndex], true, UINT64_MAX);
-    vkResetFences(d, 1, &multiFrameFences[currentFrameIndex]);
-    vkResetCommandBuffer(_commandBuffers.buffers[imageIndex], 0);
-
-    result = QueuePresent(&swapchain->GetSwapchain(), &imageIndex, *device, VK_NULL_HANDLE, 0);
-    if (result != VK_SUCCESS) {
-        DebugLog("vkQueuePresentKHR: %d", result);
-        RebuildSwapchainWithDependencies();
-        return;
-    }
+    QueuePresent(&swapchain->GetSwapchain(), &imageIndex, *device, 1, &commandsCompleteSemaphores[currentFrameIndex]);
 
     currentFrameIndex = (currentFrameIndex + 1) % swapchain->ConcurrentFramesCount();
 }
 
-void EmptySceneRenderer::RebuildSwapchainWithDependencies()
+/*void EmptySceneRenderer::RebuildSwapchainWithDependencies()
 {
     const VkDevice d = device->LogicalDevice();
 
@@ -198,6 +257,30 @@ void EmptySceneRenderer::RebuildSwapchainWithDependencies()
     renderPasses.push_back(swapchainRenderPass);
 
     CreateFramebuffers(framebuffers, *swapchain, swapchainRenderPass, *device);
+}*/
+
+void EmptySceneRenderer::RebuildSwapchain()
+{
+    const VkDevice d = device->LogicalDevice();
+
+    vkDeviceWaitIdle(d);
+
+    // Destroy
+    currentFrameToImageindex.clear();
+    imageIndexToCurrentFrame.clear();
+    framebuffers.clear();
+    for (auto& r : renderPasses) {
+        delete r;
+    }
+
+    renderPasses.clear();
+
+    // Create
+    BuildSwapchain(*swapchain);
+
+    RenderPass* swapchainRenderPass;
+    BuildRenderPass<ColorDestinationRenderPass>(swapchainRenderPass, *swapchain, *device);
+    renderPasses.push_back(swapchainRenderPass);
 }
 
 #endif

@@ -265,8 +265,8 @@ VkResult QueuePresent(const VkSwapchainKHR* pSwapchains,
 
                       const Device&         device,
 
-                      const VkSemaphore*    pWaitSemaphores,
                       uint32_t              waitSemaphoreCount,
+                      const VkSemaphore*    pWaitSemaphores,
                       uint32_t              swapchainCount,
                       VkResult*             pResults,
                       const void*           pNext)

@@ -30,7 +30,6 @@ public:
     {
         swapchain->orientationChanged = orientationChanged = true;
     }
-    bool OrientationChanged() { return orientationChanged; };
 protected:
     Renderer(void* genericWindow, uint32_t screenWidth, uint32_t screenheight);
 
@@ -61,6 +60,7 @@ protected:
     uint32_t            currentFrameIndex;
     vector<VkFence>     multiFrameFences;
     vector<VkSemaphore> imageAvailableSemaphores;
+    vector<VkSemaphore> commandsCompleteSemaphores;
 
     bool orientationChanged = false;
 };

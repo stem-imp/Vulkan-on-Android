@@ -78,8 +78,8 @@ VkResult QueuePresent(const VkSwapchainKHR* pSwapchains,
 
                       const Device&         device,
 
-                      const VkSemaphore*    pWaitSemaphores    = nullptr,
                       uint32_t              waitSemaphoreCount = 0,
+                      const VkSemaphore*    pWaitSemaphores    = nullptr,
                       uint32_t              swapchainCount     = 1,
                       VkResult*             pResults           = nullptr,
                       const void*           pNext              = nullptr);
