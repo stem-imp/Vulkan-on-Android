@@ -186,6 +186,24 @@ uint32_t MapMemoryTypeToIndex(VkPhysicalDevice physicalDevice, uint32_t memoryTy
     throw runtime_error(string("Cannot find requested properties: " + std::to_string(requestedProperties)).data());
 }
 
+VkFormat FindDeviceSupportedFormat(const vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features, const VkPhysicalDevice physicalDevice)
+{
+    for (VkFormat format : candidates) {
+        VkFormatProperties props;
+        vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &props);
+
+        if ((tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features) ||
+            (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features))
+        {
+            return format;
+        }
+    }
+
+    string tilingCode = std::to_string(tiling);
+    string feature = std::to_string(features);
+    throw runtime_error(string("Failed to find supported format for tiling[") + tilingCode + string("] and feature mask[") + feature + string("]."));
+}
+
 
 
 
@@ -252,6 +270,47 @@ VkPresentModeKHR ChooseSwapchainPresentMode(const vector<VkPresentModeKHR>& avai
         }
     }
     return bestMode;
+}
+
+VkSwapchainCreateInfoKHR SwapchainCreateInfo(VkSurfaceKHR                  surface,
+                                             uint32_t                      minImageCount,
+                                             VkFormat                      imageFormat,
+                                             VkColorSpaceKHR               imageColorSpace,
+                                             VkExtent2D                    imageExtent,
+                                             VkImageUsageFlags             imageUsage,
+                                             VkSharingMode                 imageSharingMode,
+                                             uint32_t                      queueFamilyIndexCount,
+                                             const uint32_t*               pQueueFamilyIndices,
+                                             VkSurfaceTransformFlagBitsKHR preTransform,
+                                             VkCompositeAlphaFlagBitsKHR   compositeAlpha,
+                                             VkPresentModeKHR              presentMode,
+                                             VkBool32                      clipped,
+                                             VkSwapchainKHR                oldSwapchain,
+
+                                             uint32_t                      imageArrayLayers,
+                                             const void*                   pNext,
+                                             VkSwapchainCreateFlagsKHR     flags)
+{
+    VkSwapchainCreateInfoKHR swapchainInfo = {};
+    swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    swapchainInfo.pNext = pNext;
+    swapchainInfo.flags = flags;
+    swapchainInfo.surface = surface;
+    swapchainInfo.minImageCount = minImageCount;
+    swapchainInfo.imageFormat = imageFormat;
+    swapchainInfo.imageColorSpace = imageColorSpace;
+    swapchainInfo.imageExtent = imageExtent;
+    swapchainInfo.imageArrayLayers = imageArrayLayers;
+    swapchainInfo.imageUsage = imageUsage;
+    swapchainInfo.imageSharingMode = imageSharingMode;
+    swapchainInfo.queueFamilyIndexCount = queueFamilyIndexCount;
+    swapchainInfo.pQueueFamilyIndices = pQueueFamilyIndices;
+    swapchainInfo.preTransform = preTransform;
+    swapchainInfo.compositeAlpha = compositeAlpha;
+    swapchainInfo.presentMode = presentMode;
+    swapchainInfo.clipped = clipped;
+    swapchainInfo.oldSwapchain = oldSwapchain;
+    return swapchainInfo;
 }
 
 void BuildSwapchain(Swapchain& swapchain)
@@ -353,57 +412,226 @@ VkSemaphore CreateSemaphore(VkDevice device, VkSemaphoreCreateFlags flags, const
 }
 
 
-
-
-//// ==== Graphics Pipeline ==== //
-//VkGraphicsPipelineCreateInfo CreateGraphicsPipelineInfo(uint32_t                                      stageCount,
-//                                                        const VkPipelineShaderStageCreateInfo*        pStages,
-//                                                        const VkPipelineVertexInputStateCreateInfo*   pVertexInputState,
-//                                                        const VkPipelineInputAssemblyStateCreateInfo* pInputAssemblyState,
-//                                                        const VkPipelineViewportStateCreateInfo*      pViewportState,
-//                                                        const VkPipelineRasterizationStateCreateInfo* pRasterizationState,
-//                                                        const VkPipelineColorBlendStateCreateInfo*    pColorBlendState,
-//                                                        VkPipelineLayout                              layout,
-//                                                        VkRenderPass                                  renderPass,
-//                                                        GraphicsPipelineInfoParameters                optionalParameters)
+// ==== Buffer ==== //
+//VkBuffer CreateBuffer(VkDeviceSize        size,
+//                      VkBufferUsageFlags  usage,
+//                      VkSharingMode       sharingMode,
+//                      uint32_t            queueFamilyIndexCount,
+//                      const uint32_t*     pQueueFamilyIndices,
+//                      VkDevice            device,
+//
+//                      const void*         pNext,
+//                      VkBufferCreateFlags flags)
 //{
-//    VkGraphicsPipelineCreateInfo graphicsPipelineInfo = {};
-//    graphicsPipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-//    graphicsPipelineInfo.pNext               = optionalParameters.pNext;
-//    graphicsPipelineInfo.flags               = optionalParameters.flags;
-//    graphicsPipelineInfo.stageCount          = stageCount;
-//    graphicsPipelineInfo.pStages             = pStages;
-//    graphicsPipelineInfo.pVertexInputState   = pVertexInputState;
-//    graphicsPipelineInfo.pInputAssemblyState = pInputAssemblyState;
-//    graphicsPipelineInfo.pTessellationState  = optionalParameters.pTessellationState;
-//    graphicsPipelineInfo.pViewportState      = pViewportState;
-//    graphicsPipelineInfo.pRasterizationState = pRasterizationState;
-//    graphicsPipelineInfo.pMultisampleState   = optionalParameters.pMultisampleState;
-//    graphicsPipelineInfo.pDepthStencilState  = optionalParameters.pDepthStencilState;
-//    graphicsPipelineInfo.pColorBlendState    = pColorBlendState;
-//    graphicsPipelineInfo.pDynamicState       = optionalParameters.pDynamicState;
-//    graphicsPipelineInfo.layout              = layout;
-//    graphicsPipelineInfo.renderPass          = renderPass;
-//    graphicsPipelineInfo.subpass             = optionalParameters.subpass;
-//    graphicsPipelineInfo.basePipelineHandle  = optionalParameters.basePipelineHandle;
-//    graphicsPipelineInfo.basePipelineIndex   = optionalParameters.basePipelineIndex;
-//    return graphicsPipelineInfo;
+//    VkBufferCreateInfo bufferInfo    = {};
+//    bufferInfo.sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+//    bufferInfo.pNext                 = pNext;
+//    bufferInfo.flags                 = flags;
+//    bufferInfo.size                  = size;
+//    bufferInfo.usage                 = usage;
+//    bufferInfo.sharingMode           = sharingMode;
+//    bufferInfo.queueFamilyIndexCount = queueFamilyIndexCount;
+//    bufferInfo.pQueueFamilyIndices   = pQueueFamilyIndices;
+//
+//    VkBuffer buffer;
+//    VK_CHECK_RESULT(vkCreateBuffer(device, &bufferInfo, nullptr, &buffer));
+//
+//    return  buffer;
 //}
 //
-//VkPipeline CreateGraphicsPipelines(VkDevice                            device,
-//                                   const VkGraphicsPipelineCreateInfo* pCreateInfos,
-//                                   uint32_t                            createInfoCount,
-//                                   VkPipelineCache                     pipelineCache,
-//                                   const VkAllocationCallbacks*        pAllocator)
+//VkDeviceMemory AllocateAndBindBuffer(VkBuffer buffer, uint32_t memoryTypeIndex, VkDevice device, const void* pNext, VkMemoryRequirements* memoryRequirements)
 //{
-//    VkPipeline pipeline;
-//    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, createInfoCount, pCreateInfos, pAllocator, &pipeline));
-//    return pipeline;
+//    VkMemoryRequirements memRequirements;
+//    vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+//    VkMemoryAllocateInfo memoryInfo = {};
+//    memoryInfo.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+//    memoryInfo.pNext           = pNext;
+//    memoryInfo.allocationSize  = memRequirements.size;
+//    memoryInfo.memoryTypeIndex = memoryTypeIndex;
+//    VkDeviceMemory deviceMemory;
+//    VK_CHECK_RESULT(vkAllocateMemory(device, &memoryInfo, nullptr, &deviceMemory));
+//    VK_CHECK_RESULT(vkBindBufferMemory(device, buffer, deviceMemory, 0));
+//
+//    if (memoryRequirements) {
+//        *memoryRequirements = memRequirements;
+//    }
+//    return deviceMemory;
 //}
+
+//void CreateDepthBuffer(SwapchainInfo &swapchainInfo, const DeviceInfo &deviceInfo, CommandInfo &commandInfo)
+//{
+//    VkFormat depthFormat = FindSupportedFormat({ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
+//                                               VK_IMAGE_TILING_OPTIMAL,
+//                                               VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT,
+//                                               deviceInfo.physicalDevice);
 //
-//
-//
-//
+//    CreateImage(swapchainInfo.extent.width, swapchainInfo.extent.height, 1, depthFormat, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, swapchainInfo.depthImageInfo[i].image, swapchainInfo.depthImageInfo[i].memory, deviceInfo);
+//    swapchainInfo.depthImageInfo[i].view = CreateImageView(swapchainInfo.depthImageInfo[i].image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1, deviceInfo.logicalDevices[0]);
+//    TransitionImageLayout(swapchainInfo.depthImageInfo[i].image, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 1, commandInfo, deviceInfo);
+//}
+
+
+// ==== Image ==== //
+VkImageCreateInfo ImageCreateInfo(VkFormat              format,
+                                  VkExtent3D            extent,
+                                  uint32_t              mipLevels,
+                                  VkImageTiling         tiling,
+                                  VkImageUsageFlags     usage,
+
+                                  VkImageLayout         initialLayout,
+                                  VkSampleCountFlagBits samples,
+                                  uint32_t              arrayLayers,
+                                  VkImageType           imageType,
+                                  VkImageCreateFlags    flags,
+                                  VkSharingMode         sharingMode,
+                                  uint32_t              queueFamilyIndexCount,
+                                  const uint32_t*       pQueueFamilyIndices,
+                                  const void*           pNext)
+{
+    VkImageCreateInfo imageInfo     = {};
+    imageInfo.sType                 = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.pNext                 = pNext;
+    imageInfo.flags                 = flags;
+    imageInfo.imageType             = imageType;
+    imageInfo.format                = format;
+    imageInfo.extent                = extent;
+    imageInfo.mipLevels             = mipLevels;
+    imageInfo.arrayLayers           = arrayLayers;
+    imageInfo.samples               = samples;
+    imageInfo.tiling                = tiling;
+    imageInfo.usage                 = usage;
+    imageInfo.sharingMode           = sharingMode;
+    imageInfo.queueFamilyIndexCount = queueFamilyIndexCount;
+    imageInfo.pQueueFamilyIndices   = pQueueFamilyIndices;
+    imageInfo.initialLayout         = initialLayout;
+    return imageInfo;
+}
+
+VkImageMemoryBarrier ImageMemoryBarrier(VkAccessFlags           srcAccessMask,
+                                        VkAccessFlags           dstAccessMask,
+                                        VkImageLayout           oldLayout,
+                                        VkImageLayout           newLayout,
+                                        VkImage                 image,
+                                        VkImageSubresourceRange subresourceRange,
+                                        uint32_t                srcQueueFamilyIndex,
+                                        uint32_t                dstQueueFamilyIndex,
+                                        const void*             pNext)
+{
+    VkImageMemoryBarrier imageMemoryBarrier = {};
+    imageMemoryBarrier.sType                = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    imageMemoryBarrier.srcAccessMask        = srcAccessMask;
+    imageMemoryBarrier.dstAccessMask        = dstAccessMask;
+    imageMemoryBarrier.oldLayout            = oldLayout;
+    imageMemoryBarrier.newLayout            = newLayout;
+    imageMemoryBarrier.srcQueueFamilyIndex  = srcQueueFamilyIndex;
+    imageMemoryBarrier.dstQueueFamilyIndex  = dstQueueFamilyIndex;
+    imageMemoryBarrier.image                = image;
+    imageMemoryBarrier.subresourceRange     = subresourceRange;
+    imageMemoryBarrier.pNext                = pNext;
+    return imageMemoryBarrier;
+}
+
+void TransitionImageLayout(PipelineBarrierParameters* parameters)
+{
+    vkCmdPipelineBarrier(parameters->commandBuffer,
+                         parameters->srcStageMask,
+                         parameters->dstStageMask,
+                         parameters->dependencyFlags,
+                         parameters->memoryBarrierCount,
+                         parameters->pMemoryBarriers,
+                         parameters->bufferMemoryBarrierCount,
+                         parameters->pBufferMemoryBarriers,
+                         parameters->imageMemoryBarrierCount,
+                         parameters->pImageMemoryBarriers);
+}
+
+VkMemoryAllocateInfo MemoryAllocateInfo(VkImage               image,
+                                        VkMemoryPropertyFlags requestedProperties,
+                                        const Device&         device,
+                                        VkMemoryRequirements& memoryRequirements,
+                                        uint32_t&             memoryTypeIndex,
+
+                                        void*                 pNext)
+{
+    vkGetImageMemoryRequirements(device.LogicalDevice(), image, &memoryRequirements);
+    memoryTypeIndex = MapMemoryTypeToIndex(device.PhysicalDevice(), memoryRequirements.memoryTypeBits, requestedProperties);
+    VkMemoryAllocateInfo memoryAllocateInfo = {};
+    memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    memoryAllocateInfo.pNext = pNext;
+    memoryAllocateInfo.allocationSize = memoryRequirements.size;
+    memoryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
+    return memoryAllocateInfo;
+}
+
+VkImageViewCreateInfo ImageViewCreateInfo(VkImage                 image,
+                                          VkFormat                format,
+                                          VkImageSubresourceRange subresourceRange,
+                                          VkImageViewType         viewType,
+                                          VkComponentMapping      components,
+                                          const void*             pNext,
+                                          VkImageViewCreateFlags  flags)
+{
+    VkImageViewCreateInfo imageViewInfo = {};
+    imageViewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    imageViewInfo.pNext = pNext;
+    imageViewInfo.image = image;
+    imageViewInfo.viewType = viewType;
+    imageViewInfo.format   = format;
+    imageViewInfo.components = components;
+    imageViewInfo.subresourceRange = subresourceRange;
+    return imageViewInfo;
+}
+
+
+// ==== Pipeline ==== //
+VkGraphicsPipelineCreateInfo CreateGraphicsPipelineInfo(uint32_t                                      stageCount,
+                                                        const VkPipelineShaderStageCreateInfo*        pStages,
+                                                        const VkPipelineVertexInputStateCreateInfo*   pVertexInputState,
+                                                        const VkPipelineInputAssemblyStateCreateInfo* pInputAssemblyState,
+                                                        const VkPipelineViewportStateCreateInfo*      pViewportState,
+                                                        const VkPipelineRasterizationStateCreateInfo* pRasterizationState,
+                                                        const VkPipelineColorBlendStateCreateInfo*    pColorBlendState,
+                                                        VkPipelineLayout                              layout,
+                                                        VkRenderPass                                  renderPass,
+                                                        GraphicsPipelineInfoParameters                optionalParameters)
+{
+    VkGraphicsPipelineCreateInfo graphicsPipelineInfo = {};
+    graphicsPipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    graphicsPipelineInfo.pNext               = optionalParameters.pNext;
+    graphicsPipelineInfo.flags               = optionalParameters.flags;
+    graphicsPipelineInfo.stageCount          = stageCount;
+    graphicsPipelineInfo.pStages             = pStages;
+    graphicsPipelineInfo.pVertexInputState   = pVertexInputState;
+    graphicsPipelineInfo.pInputAssemblyState = pInputAssemblyState;
+    graphicsPipelineInfo.pTessellationState  = optionalParameters.pTessellationState;
+    graphicsPipelineInfo.pViewportState      = pViewportState;
+    graphicsPipelineInfo.pRasterizationState = pRasterizationState;
+    graphicsPipelineInfo.pMultisampleState   = optionalParameters.pMultisampleState;
+    graphicsPipelineInfo.pDepthStencilState  = optionalParameters.pDepthStencilState;
+    graphicsPipelineInfo.pColorBlendState    = pColorBlendState;
+    graphicsPipelineInfo.pDynamicState       = optionalParameters.pDynamicState;
+    graphicsPipelineInfo.layout              = layout;
+    graphicsPipelineInfo.renderPass          = renderPass;
+    graphicsPipelineInfo.subpass             = optionalParameters.subpass;
+    graphicsPipelineInfo.basePipelineHandle  = optionalParameters.basePipelineHandle;
+    graphicsPipelineInfo.basePipelineIndex   = optionalParameters.basePipelineIndex;
+    return graphicsPipelineInfo;
+}
+
+VkPipeline CreateGraphicsPipelines(VkDevice                            device,
+                                   const VkGraphicsPipelineCreateInfo* pCreateInfos,
+                                   uint32_t                            createInfoCount,
+                                   VkPipelineCache                     pipelineCache,
+                                   const VkAllocationCallbacks*        pAllocator)
+{
+    VkPipeline pipeline;
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, createInfoCount, pCreateInfos, pAllocator, &pipeline));
+    return pipeline;
+}
+
+
+
+
 //// ==== Image ==== //
 //VkFormat FindSupportedFormat(const vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features, VkPhysicalDevice physicalDevice)
 //{
@@ -563,65 +791,4 @@ VkImageView CreateImageView(VkImage                image,
 //    imageMemoryBarrier.subresourceRange.baseArrayLayer = baseArrayLayer;
 //    imageMemoryBarrier.subresourceRange.layerCount     = layerCount;
 //    vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
-//}
-
-
-
-
-// ==== Buffer ==== //
-VkBuffer CreateBuffer(VkDeviceSize        size,
-                      VkBufferUsageFlags  usage,
-                      VkSharingMode       sharingMode,
-                      uint32_t            queueFamilyIndexCount,
-                      const uint32_t*     pQueueFamilyIndices,
-                      VkDevice device,
-
-                      const void*         pNext = nullptr,
-                      VkBufferCreateFlags flags = 0)
-{
-    VkBufferCreateInfo bufferInfo = {};
-    bufferInfo.sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.pNext                 = pNext;
-    bufferInfo.flags                 = flags;
-    bufferInfo.size                  = size;
-    bufferInfo.usage                 = usage;
-    bufferInfo.sharingMode           = sharingMode;
-    bufferInfo.queueFamilyIndexCount = queueFamilyIndexCount;
-    bufferInfo.pQueueFamilyIndices   = pQueueFamilyIndices;
-
-    VkBuffer buffer;
-    VK_CHECK_RESULT(vkCreateBuffer(device, &bufferInfo, nullptr, &buffer));
-
-    return  buffer;
-}
-
-VkDeviceMemory AllocateAndBindBuffer(VkBuffer buffer, uint32_t memoryTypeIndex, VkDevice device, const void* pNext, VkMemoryRequirements* memoryRequirements)
-{
-    VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
-    VkMemoryAllocateInfo memoryInfo = {};
-    memoryInfo.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    memoryInfo.pNext           = pNext;
-    memoryInfo.allocationSize  = memRequirements.size;
-    memoryInfo.memoryTypeIndex = memoryTypeIndex;
-    VkDeviceMemory deviceMemory;
-    VK_CHECK_RESULT(vkAllocateMemory(device, &memoryInfo, nullptr, &deviceMemory));
-    VK_CHECK_RESULT(vkBindBufferMemory(device, buffer, deviceMemory, 0));
-
-    if (memoryRequirements) {
-        *memoryRequirements = memRequirements;
-    }
-    return deviceMemory;
-}
-
-//void CreateDepthBuffer(SwapchainInfo &swapchainInfo, const DeviceInfo &deviceInfo, CommandInfo &commandInfo)
-//{
-//    VkFormat depthFormat = FindSupportedFormat({ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
-//                                               VK_IMAGE_TILING_OPTIMAL,
-//                                               VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT,
-//                                               deviceInfo.physicalDevice);
-//
-//    CreateImage(swapchainInfo.extent.width, swapchainInfo.extent.height, 1, depthFormat, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, swapchainInfo.depthImageInfo[i].image, swapchainInfo.depthImageInfo[i].memory, deviceInfo);
-//    swapchainInfo.depthImageInfo[i].view = CreateImageView(swapchainInfo.depthImageInfo[i].image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1, deviceInfo.logicalDevices[0]);
-//    TransitionImageLayout(swapchainInfo.depthImageInfo[i].image, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 1, commandInfo, deviceInfo);
 //}

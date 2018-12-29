@@ -84,8 +84,11 @@ add_library( # Sets the name of the library.
         src/main/cpp/vulkan/swapchain.cpp
         src/main/cpp/vulkan/renderpass/renderpass.cpp
         src/main/cpp/vulkan/renderpass/color_dst_renderpass.cpp
+        src/main/cpp/vulkan/renderpass/color_depth_renderpass.cpp
         src/main/cpp/vulkan/framebuffer.cpp
         src/main/cpp/vulkan/command.cpp
+        src/main/cpp/vulkan/buffer.cpp
+        src/main/cpp/vulkan/model.cpp
 
         src/main/cpp/vulkan/android/vulkan_android.cpp
         src/main/cpp/vulkan/vulkan_utility.cpp
@@ -94,6 +97,8 @@ add_library( # Sets the name of the library.
         src/main/cpp/vulkan_main.cpp
         src/main/cpp/scene/emptyscene/android/empty_scene_renderer_vulkan_android.cpp
         src/main/cpp/scene/emptyscene/android/empty_scene_android.cpp
+        src/main/cpp/scene/earthscene/android/earth_scene_renderer_android.cpp
+        src/main/cpp/scene/earthscene/android/earth_scene_android.cpp
         src/main/cpp/scene/scene.cpp
         src/main/cpp/main.cpp )
 

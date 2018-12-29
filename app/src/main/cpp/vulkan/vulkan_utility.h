@@ -12,6 +12,7 @@
 #include "swapchain.h"
 #include "renderpass/renderpass.h"
 #include "framebuffer.h"
+#include "command.h"
 
 #include <string>
 #include <vector>
@@ -24,6 +25,7 @@ using Vulkan::Device;
 using Vulkan::Swapchain;
 using Vulkan::RenderPass;
 using Vulkan::Framebuffer;
+using Vulkan::Command;
 using std::runtime_error;
 
 #define VK_CHECK_RESULT(func)											                \
@@ -56,6 +58,7 @@ bool IsPhysicalDeviceSuitable(Device&                         device,
                               Surface&                        surface,
                               bool                            needPresent = true);
 uint32_t MapMemoryTypeToIndex(VkPhysicalDevice physicalDevice, uint32_t memoryTypeBits, VkMemoryPropertyFlags requestedProperties);
+VkFormat FindDeviceSupportedFormat(const vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features, const VkPhysicalDevice physicalDevice);
 
 
 // ==== Swapchain ==== //
@@ -72,6 +75,24 @@ VkSurfaceFormatKHR ChooseSurfaceFormat(const vector<VkSurfaceFormatKHR>& formats
                                        });
 VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, uint32_t width, uint32_t height);
 VkPresentModeKHR ChooseSwapchainPresentMode(const vector<VkPresentModeKHR>& availablePresentModes, const VkSurfaceCapabilitiesKHR& surfaceCapabilities, bool vSync = false);
+VkSwapchainCreateInfoKHR SwapchainCreateInfo(VkSurfaceKHR                  surface,
+                                             uint32_t                      minImageCount,
+                                             VkFormat                      imageFormat,
+                                             VkColorSpaceKHR               imageColorSpace,
+                                             VkExtent2D                    imageExtent,
+                                             VkImageUsageFlags             imageUsage,
+                                             VkSharingMode                 imageSharingMode,
+                                             uint32_t                      queueFamilyIndexCount,
+                                             const uint32_t*               pQueueFamilyIndices,
+                                             VkSurfaceTransformFlagBitsKHR preTransform,
+                                             VkCompositeAlphaFlagBitsKHR   compositeAlpha,
+                                             VkPresentModeKHR              presentMode,
+                                             VkBool32                      clipped,
+                                             VkSwapchainKHR                oldSwapchain,
+
+                                             uint32_t                      imageArrayLayers = 1,
+                                             const void*                   pNext            = 0,
+                                             VkSwapchainCreateFlagsKHR     flags            = 0);
 void BuildSwapchain(Vulkan::Swapchain& swapchain);
 VkResult QueuePresent(const VkSwapchainKHR* pSwapchains,
                       const uint32_t*       pImageIndices,
@@ -131,32 +152,120 @@ VkFence CreateFence(VkDevice device, VkFenceCreateFlags flags = VK_FENCE_CREATE_
 VkSemaphore CreateSemaphore(VkDevice device, VkSemaphoreCreateFlags flags = 0, const void* pNext = nullptr);
 
 
-//typedef struct GraphicsPipelineInfoParameters {
-//    const VkPipelineDepthStencilStateCreateInfo*  pDepthStencilState = nullptr;
-//    const VkPipelineMultisampleStateCreateInfo*   pMultisampleState  = nullptr;
-//    const VkPipelineDynamicStateCreateInfo*       pDynamicState      = nullptr;
-//    uint32_t                                      subpass            = 0;
-//    const VkPipelineTessellationStateCreateInfo*  pTessellationState = nullptr;
-//    VkPipeline                                    basePipelineHandle = VK_NULL_HANDLE;
-//    int32_t                                       basePipelineIndex  = -1;
-//    const void*                                   pNext              = nullptr;
-//    VkPipelineCreateFlags                         flags              = 0;
-//} GraphicsPipelineInfoParameters;
-//VkGraphicsPipelineCreateInfo CreateGraphicsPipelineInfo(uint32_t                                      stageCount,
-//                                                        const VkPipelineShaderStageCreateInfo*        pStages,
-//                                                        const VkPipelineVertexInputStateCreateInfo*   pVertexInputState,
-//                                                        const VkPipelineInputAssemblyStateCreateInfo* pInputAssemblyState,
-//                                                        const VkPipelineViewportStateCreateInfo*      pViewportState,
-//                                                        const VkPipelineRasterizationStateCreateInfo* pRasterizationState,
-//                                                        const VkPipelineColorBlendStateCreateInfo*    pColorBlendState,
-//                                                        VkPipelineLayout                              layout,
-//                                                        VkRenderPass                                  renderPass,
-//                                                        GraphicsPipelineInfoParameters                optionalParameters = {});
-//VkPipeline CreateGraphicsPipelines(VkDevice                            device,
-//                                   const VkGraphicsPipelineCreateInfo* pCreateInfos,
-//                                   uint32_t                            createInfoCount = 1,
-//                                   VkPipelineCache                     pipelineCache   = VK_NULL_HANDLE,
-//                                   const VkAllocationCallbacks*        pAllocator      = nullptr);
+// ==== Buffer ==== //
+//VkBuffer CreateBuffer(VkDeviceSize        size,
+//                      VkBufferUsageFlags  usage,
+//                      VkSharingMode       sharingMode,
+//                      uint32_t            queueFamilyIndexCount,
+//                      const uint32_t*     pQueueFamilyIndices,
+//                      VkDevice            device,
+//
+//                      const void*         pNext = nullptr,
+//                      VkBufferCreateFlags flags = 0);
+//
+//VkDeviceMemory AllocateAndBindBuffer(VkBuffer buffer,
+//                                     uint32_t memoryTypeIndex,
+//                                     VkDevice device,
+//
+//                                     const void*           pNext,
+//                                     VkMemoryRequirements* memoryRequirements);
+
+
+// Image
+VkImageCreateInfo ImageCreateInfo(VkFormat              format,
+                                  VkExtent3D            extent,
+                                  uint32_t              mipLevels,
+                                  VkImageTiling         tiling,
+                                  VkImageUsageFlags     usage,
+
+                                  VkImageLayout         initialLayout          = VK_IMAGE_LAYOUT_UNDEFINED,
+                                  VkSampleCountFlagBits samples                = VK_SAMPLE_COUNT_1_BIT,
+                                  uint32_t              arrayLayers            = 1,
+                                  VkImageType           imageType              = VK_IMAGE_TYPE_2D,
+                                  VkImageCreateFlags    flags                  = 0,
+                                  VkSharingMode         sharingMode            = VK_SHARING_MODE_EXCLUSIVE,
+                                  uint32_t              queueFamilyIndexCount  = 0,
+                                  const uint32_t*       pQueueFamilyIndices    = nullptr,
+                                  const void*           pNext                  = nullptr);
+
+VkImageMemoryBarrier ImageMemoryBarrier(VkAccessFlags           srcAccessMask,
+                                        VkAccessFlags           dstAccessMask,
+                                        VkImageLayout           oldLayout,
+                                        VkImageLayout           newLayout,
+                                        VkImage                 image,
+                                        VkImageSubresourceRange subresourceRange    = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 },
+                                        uint32_t                srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                                        uint32_t                dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                                        const void*             pNext               = nullptr);
+typedef struct PipelineBarrierParameters {
+    PipelineBarrierParameters()
+    {
+        srcStageMask             = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
+        dstStageMask             = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
+        dependencyFlags          = 0;
+        memoryBarrierCount       = 0;
+        pMemoryBarriers          = nullptr;
+        bufferMemoryBarrierCount = 0;
+        pBufferMemoryBarriers    = nullptr;
+        imageMemoryBarrierCount  = 0;
+        pImageMemoryBarriers     = nullptr;
+    }
+    VkCommandBuffer              commandBuffer;
+    VkPipelineStageFlags         srcStageMask;
+    VkPipelineStageFlags         dstStageMask;
+    VkDependencyFlags            dependencyFlags;
+    uint32_t                     memoryBarrierCount;
+    const VkMemoryBarrier*       pMemoryBarriers;
+    uint32_t                     bufferMemoryBarrierCount;
+    const VkBufferMemoryBarrier* pBufferMemoryBarriers;
+    uint32_t                     imageMemoryBarrierCount;
+    const VkImageMemoryBarrier*  pImageMemoryBarriers;
+} PipelineBarrierParameters;
+void TransitionImageLayout(PipelineBarrierParameters* parameters);
+
+VkMemoryAllocateInfo MemoryAllocateInfo(VkImage               image,
+                                        VkMemoryPropertyFlags requestedProperties,
+                                        const Device&         device,
+                                        VkMemoryRequirements& memoryRequirements,
+                                        uint32_t&             memoryTypeIndex,
+
+                                        void*                 pNext = nullptr);
+VkImageViewCreateInfo ImageViewCreateInfo(VkImage                 image,
+                                          VkFormat                format,
+                                          VkImageSubresourceRange subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 },
+                                          VkImageViewType         viewType         = VK_IMAGE_VIEW_TYPE_2D,
+                                          VkComponentMapping      components       = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
+                                          const void*             pNext            = nullptr,
+                                          VkImageViewCreateFlags  flags            = 0);
+
+
+// ==== Pipeline ==== //
+typedef struct GraphicsPipelineInfoParameters {
+    const VkPipelineDepthStencilStateCreateInfo* pDepthStencilState = nullptr;
+    const VkPipelineMultisampleStateCreateInfo*  pMultisampleState  = nullptr;
+    const VkPipelineDynamicStateCreateInfo*      pDynamicState      = nullptr;
+    uint32_t                                     subpass            = 0;
+    const VkPipelineTessellationStateCreateInfo* pTessellationState = nullptr;
+    VkPipeline                                   basePipelineHandle = VK_NULL_HANDLE;
+    int32_t                                      basePipelineIndex  = -1;
+    const void*                                  pNext              = nullptr;
+    VkPipelineCreateFlags                        flags              = 0;
+} GraphicsPipelineInfoParameters;
+VkGraphicsPipelineCreateInfo CreateGraphicsPipelineInfo(uint32_t                                      stageCount,
+                                                        const VkPipelineShaderStageCreateInfo*        pStages,
+                                                        const VkPipelineVertexInputStateCreateInfo*   pVertexInputState,
+                                                        const VkPipelineInputAssemblyStateCreateInfo* pInputAssemblyState,
+                                                        const VkPipelineViewportStateCreateInfo*      pViewportState,
+                                                        const VkPipelineRasterizationStateCreateInfo* pRasterizationState,
+                                                        const VkPipelineColorBlendStateCreateInfo*    pColorBlendState,
+                                                        VkPipelineLayout                              layout,
+                                                        VkRenderPass                                  renderPass,
+                                                        GraphicsPipelineInfoParameters                optionalParameters = GraphicsPipelineInfoParameters());
+VkPipeline CreateGraphicsPipelines(VkDevice                            device,
+                                   const VkGraphicsPipelineCreateInfo* pCreateInfos,
+                                   uint32_t                            createInfoCount = 1,
+                                   VkPipelineCache                     pipelineCache   = VK_NULL_HANDLE,
+                                   const VkAllocationCallbacks*        pAllocator      = nullptr);
 //
 //VkPipeline BuildDefaultGraphicsPipeline()
 //{
@@ -170,23 +279,5 @@ VkSemaphore CreateSemaphore(VkDevice device, VkSemaphoreCreateFlags flags = 0, c
 //                             uint32_t          mipLevels,
 //                             VkImageUsageFlags usage,
 //                             VkDevice          device);
-//void TransitionImageLayout(VkPipelineStageFlags sourceStage,
-//                           VkPipelineStageFlags destinationStage,
-//                           VkAccessFlags        srcAccessMask,
-//                           VkAccessFlags        dstAccessMask,
-//                           VkImageLayout        oldLayout,
-//                           VkImageLayout        newLayout,
-//                           VkImage              image,
-//                           VkImageAspectFlags   aspectMask,
-//
-//                           VkCommandBuffer      commandBuffer,
-//
-//                           const void*          pNext               = nullptr,
-//                           uint32_t             srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-//                           uint32_t             dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-//                           uint32_t             baseMipLevel        = 0,
-//                           uint32_t             levelCount          = 1,
-//                           uint32_t             baseArrayLayer      = 0,
-//                           uint32_t             layerCount          = 1);
 
 #endif // VULKAN_UTILITY_H
