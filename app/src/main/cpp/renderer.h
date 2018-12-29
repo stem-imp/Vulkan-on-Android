@@ -41,7 +41,7 @@ protected:
     Extent2D screenSize = { 0, 0 };
 
     // ==== Vulkan ==== //
-    void SysInitVulkan()
+    static void SysInitVulkan()
     {
         if (!InitVulkan()) {
             throw runtime_error("Vulkan is unavailable, install Vulkan and re-start.");

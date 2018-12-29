@@ -1,6 +1,7 @@
 ﻿#ifdef __ANDROID__
 
 #include "../empty_scene.h"
+#include "../empty_scene_renderer_vulkan.h"
 #include <android_native_app_glue.h>
 #include "../../../log/log.h"
 //#include <array>

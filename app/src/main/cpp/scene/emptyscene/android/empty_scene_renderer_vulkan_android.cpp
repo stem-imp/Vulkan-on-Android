@@ -1,10 +1,10 @@
 ﻿#ifdef __ANDROID__
 
-#include "empty_scene_renderer_vulkan_android.h"
+#include "../empty_scene_renderer_vulkan.h"
 #include "../../../vulkan/renderpass/color_dst_renderpass.h"
 //#include "../../../vulkan/texture.h"
 #include "../../../vulkan/vulkan_utility.h"
-#include "../../../vulkan/vulkan_workflow.h"
+//#include "../../../vulkan/vulkan_workflow.h"
 #include <unordered_map>
 
 using Vulkan::Instance;
@@ -19,7 +19,7 @@ using std::unordered_map;
 static unordered_map<int, int> currentFrameToImageindex;
 static unordered_map<int, int> imageIndexToCurrentFrame;
 
-EmptySceneRenderer::EmptySceneRenderer(void* genericWindow, uint32_t screenWidth, uint32_t screenheight) : Renderer(genericWindow, screenWidth, screenheight)
+EmptySceneRenderer::EmptySceneRenderer(void* genericWindow, uint32_t screenWidth, uint32_t screenHeight) : Renderer(genericWindow, screenWidth, screenHeight)
 {
     SysInitVulkan();
     instance = new Instance();

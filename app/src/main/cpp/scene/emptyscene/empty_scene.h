@@ -2,7 +2,6 @@
 #define APP_EMPTY_SCENE_H
 
 #include "../scene.h"
-#include "android/empty_scene_renderer_vulkan_android.h"
 
 class EmptyScene : public Scene
 {
