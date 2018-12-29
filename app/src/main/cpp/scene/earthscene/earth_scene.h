@@ -5,9 +5,6 @@
 #include "../../vulkan/model.h"
 #include <vector>
 
-using Vulkan::Model;
-using std::vector;
-
 class EarthScene : public Scene
 {
 public:
@@ -15,10 +12,6 @@ public:
     ~EarthScene();
 
     bool UpdateImpl() override;
-
-private:
-    // ==== Vulkan ==== //
-    vector<Model> _models;
 };
 
 

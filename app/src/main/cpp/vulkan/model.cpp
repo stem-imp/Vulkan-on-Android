@@ -11,29 +11,27 @@ static void LoadMaterialTextures(aiMaterial* mat, aiTextureType type, string typ
 
 namespace Vulkan {
 
-    const int Model::DEFAULT_READ_FILE_FLAGS = aiProcess_Triangulate |
-                                               aiProcess_ValidateDataStructure |
-                                               aiProcess_RemoveRedundantMaterials |
-                                               aiProcess_FixInfacingNormals |
-                                               aiProcess_FindDegenerates |
-                                               aiProcess_FindInvalidData |
-                                               aiProcess_OptimizeMeshes |
-                                               aiProcess_OptimizeGraph |
-                                               aiProcess_FlipUVs;
+    const unsigned int Model::DEFAULT_READ_FILE_FLAGS = aiProcess_Triangulate |
+                                                        aiProcess_ValidateDataStructure |
+                                                        aiProcess_RemoveRedundantMaterials |
+                                                        aiProcess_FixInfacingNormals |
+                                                        aiProcess_FindDegenerates |
+                                                        aiProcess_FindInvalidData |
+                                                        aiProcess_OptimizeMeshes |
+                                                        aiProcess_OptimizeGraph |
+                                                        aiProcess_FlipUVs;
 
-    Model::Model(const Device& device) : vertices(device), indices(device)
+    Model::Model(const Device& device) : device(device), vertices(device), indices(device)
     {
         DebugLog("Model()");
-        this->device = device.LogicalDevice();
     }
 
-    Model::Model(Model&& other) : vertices(std::move(other.vertices)), indices(std::move(other.indices))
+    Model::Model(Model&& other) : device(other.device), vertices(std::move(other.vertices)), indices(std::move(other.indices))
     {
         DebugLog("Model(Model&&)");
         subMeshes   = std::move(other.subMeshes);
-        device      = other.device               , other.device         = nullptr;
-        indexCount  = other.indexCount           , other.indexCount     = 0;
-        vertexCount = other.vertexCount          , other.vertexCount    = 0;
+        //indexCount  = other.indexCount           , other.indexCount     = 0;
+        //vertexCount = other.vertexCount          , other.vertexCount    = 0;
         dimension   = other.dimension            , other.dimension.size = vec3(0)
                                                  , other.dimension.min  = vec3(0)
                                                  , other.dimension.max  = vec3(0);
@@ -44,26 +42,26 @@ namespace Vulkan {
         DebugLog("~Model()");
     }
 
-    bool Model::RealFile(const string&       filename,
-                         const VertexLayout& vertexLayout,
-                         const Device&       device,
-                         Command&            command,
-
-                         ModelCreateInfo*    modelInfo,
-                         int                 readFileFlags)
+    bool Model::ReadFile(const string&       filename,
+                         const aiScene*&     output,
+                         unsigned int        readFileFlags)
     {
         Assimp::Importer importer;
         if ((readFileFlags & aiProcess_Triangulate) != aiProcess_Triangulate) {
             readFileFlags |= aiProcess_Triangulate;
         }
-        const aiScene* scene = importer.ReadFile(filename, readFileFlags);
+        const aiScene* scene = output = importer.ReadFile(filename, readFileFlags);
         if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
         {
             Log::Error("%s", importer.GetErrorString());
+            output = nullptr;
             return false;
         }
-        ProcessNode(scene->mRootNode, scene);
+        return true;
+    }
 
+    void Model::UploadToGPU(const aiScene*& scene, const VertexLayout& vertexLayout, Command& command, ModelCreateInfo* modelInfo)
+    {
         subMeshes.clear();
         subMeshes.resize(scene->mNumMeshes);
 
@@ -78,8 +76,8 @@ namespace Vulkan {
         std::vector<float> vertexBuffer;
         std::vector<uint32_t> indexBuffer;
 
-        vertexCount = 0;
-        indexCount = 0;
+        uint32_t vertexCount = 0;
+        uint32_t indexCount  = 0;
 
         for (uint32_t i = 0; i < scene->mNumMeshes; i++) {
             const aiMesh* mesh = scene->mMeshes[i];
@@ -153,12 +151,6 @@ namespace Vulkan {
             for (uint32_t j = 0; j < mesh->mNumFaces; j++)
             {
                 const aiFace& Face = mesh->mFaces[j];
-                if (Face.mNumIndices != 3) {
-                    vertexBuffer.clear();
-                    indexBuffer.clear();
-                    subMeshes.clear();
-                    return  false;
-                }
                 indexBuffer.push_back(indexBase + Face.mIndices[0]);
                 indexBuffer.push_back(indexBase + Face.mIndices[1]);
                 indexBuffer.push_back(indexBase + Face.mIndices[2]);
@@ -192,8 +184,6 @@ namespace Vulkan {
         vkCmdCopyBuffer(copyCmd, indexStaging.GetBuffer(), indices.GetBuffer(), 1, &copyRegion);
 
         Command::EndAndSubmitCommandBuffer(copyCmd, device.FamilyQueues().transfer.queue, command.ShortLivedTransferPool(), d);
-
-        return true;
     }
 }
 
@@ -226,6 +216,7 @@ void ProcessMesh(aiMesh* mesh, const aiScene* scene)
 
     aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
 
+#ifndef NDEBUG
     aiReturn res;
     aiColor3D color3;
     int mode;
@@ -256,6 +247,7 @@ void ProcessMesh(aiMesh* mesh, const aiScene* scene)
     DebugLog("  %d shininess strength %f", res, valuef);
     res = material->Get(AI_MATKEY_REFRACTI, valuef);
     DebugLog("  %d refracti %f", res, valuef);
+#endif
 
     LoadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_diffuse");
     LoadMaterialTextures(material, aiTextureType_SPECULAR, "texture_specular");
@@ -276,12 +268,17 @@ void LoadMaterialTextures(aiMaterial* mat, aiTextureType type, string typeName)
     DebugLog("  %d textures of type %s", textureCount, typeName.c_str());
     for(unsigned int i = 0; i < textureCount; i++)
     {
-        aiString str1, str2;
-        aiReturn res1, res2, res3, res4, res5, res6, res7, res8, res9, res10;
+        aiString str1;
+        aiReturn res1;
+        res1 = mat->GetTexture(type, i, &str1);
+        DebugLog("  %d, %d, %s, PATH, %s",                  i, res1, typeName.c_str(), str1.C_Str());
+
+#ifndef NDEBUG
+        aiString str2;
+        aiReturn res2, res3, res4, res5, res6, res7, res8, res9, res10;
         float f3;
         int int4, int5, int6, int7, int8, int10;
         aiVector3D v3d9;
-        res1 = mat->GetTexture(type, i, &str1);
         res2 = mat->Get(AI_MATKEY_TEXTURE(type, i), str2);
         res3 = mat->Get(AI_MATKEY_TEXBLEND(type, i), f3);
         res4 = mat->Get(AI_MATKEY_TEXOP(type, i), int4);
@@ -292,7 +289,7 @@ void LoadMaterialTextures(aiMaterial* mat, aiTextureType type, string typeName)
         res9 = mat->Get(AI_MATKEY_TEXMAP_AXIS(type, i), v3d9);
         res10 = mat->Get(AI_MATKEY_TEXFLAGS(type, i), int10);
         // check if texture was loaded before and if so, continue to next iteration: skip loading a new texture
-        DebugLog("  %d, %d, %s, PATH, %s",                  i, res1, typeName.c_str(), str1.C_Str());
+
         DebugLog("  %d, %d, %s, TEXTURE, %s",               i, res2, typeName.c_str(), str2.C_Str());
         DebugLog("  %d, %d, %s, TEXBLEND, %f",              i, res3, typeName.c_str(), f3);
         DebugLog("  %d, %d, %s, TEXOP, %d",                 i, res4, typeName.c_str(), int4);
@@ -302,5 +299,6 @@ void LoadMaterialTextures(aiMaterial* mat, aiTextureType type, string typeName)
         DebugLog("  %d, %d, %s, MAPPINGMODE_V, %d",         i, res8, typeName.c_str(), int8);
         DebugLog("  %d, %d, %s, TEXMAP_AXIS, (%f, %f, %f)", i, res9, typeName.c_str(), v3d9.x, v3d9.y, v3d9.z);
         DebugLog("  %d, %d, %s, TEXFLAGS, %d",              i, res10, typeName.c_str(), int10);
+#endif
     }
 }

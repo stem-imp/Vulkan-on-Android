@@ -19,7 +19,7 @@ using std::unordered_map;
 static unordered_map<int, int> currentFrameToImageindex;
 static unordered_map<int, int> imageIndexToCurrentFrame;
 
-EmptySceneRenderer::EmptySceneRenderer(void* genericWindow, uint32_t screenWidth, uint32_t screenHeight) : Renderer(genericWindow, screenWidth, screenHeight)
+EmptySceneRenderer::EmptySceneRenderer(void* app, uint32_t screenWidth, uint32_t screenHeight) : Renderer(app, screenWidth, screenHeight)
 {
     SysInitVulkan();
     instance = new Instance();

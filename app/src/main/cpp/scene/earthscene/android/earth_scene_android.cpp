@@ -5,8 +5,6 @@
 #include "../../../log/log.h"
 #include "../earth_scene_renderer.h"
 
-using Vulkan::Component;
-
 static bool OnActivate();
 static void OnDeactivate();
 
@@ -39,16 +37,10 @@ EarthScene::EarthScene(void* state) : Scene(state)
     eventLoop.onDestroy = OnDestroy;
 
     eventLoop.onInitWindow = [this](android_app* app) -> void {
+
         int32_t w = ANativeWindow_getWidth(app->window);
         int32_t h = ANativeWindow_getHeight(app->window);
-        renderer = new EarthSceneRenderer(app->window, w, h);
-
-        EarthSceneRenderer* earthSceneRenderer = (EarthSceneRenderer*)renderer;
-        Vulkan::VertexLayout vertexLayout = vector<Component>{ Component::VERTEX_COMPONENT_POSITION,
-                                                               Component::VERTEX_COMPONENT_NORMAL,
-                                                               Component::VERTEX_COMPONENT_UV };
-        Model tmp(earthSceneRenderer->LoadModel(string(app->activity->externalDataPath) + string("/earth/earth.obj"), vertexLayout));
-        _models.emplace_back(std::move(tmp));
+        renderer = new EarthSceneRenderer(app, w, h);
 
         OnInitWindow(app);
     };
@@ -72,8 +64,6 @@ EarthScene::EarthScene(void* state) : Scene(state)
 
 EarthScene::~EarthScene()
 {
-    _models.clear();
-
     delete renderer;
     renderer = nullptr;
 }

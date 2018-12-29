@@ -239,6 +239,18 @@ VkImageViewCreateInfo ImageViewCreateInfo(VkImage                 image,
                                           VkImageViewCreateFlags  flags            = 0);
 
 
+// ==== Shader ==== //
+template <typename T>
+VkShaderModuleCreateInfo ShaderModuleCreateInfo(vector<T>& fileContent)
+{
+    VkShaderModuleCreateInfo shaderModuleInfo = {};
+    shaderModuleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    shaderModuleInfo.codeSize = fileContent.size();
+    shaderModuleInfo.pCode = (const uint32_t*)fileContent.data();
+    return shaderModuleInfo;
+}
+
+
 // ==== Pipeline ==== //
 typedef struct GraphicsPipelineInfoParameters {
     const VkPipelineDepthStencilStateCreateInfo* pDepthStencilState = nullptr;

@@ -102,23 +102,18 @@ namespace Vulkan {
         Model(Model&& other);
         virtual ~Model();
 
-        static const int DEFAULT_READ_FILE_FLAGS;
+        static const unsigned int DEFAULT_READ_FILE_FLAGS;
 
-        bool RealFile(const string&       filename,
-                      const VertexLayout& vertexLayout,
-                      const Device&       device,
-                      Command&            command,
-
-                      ModelCreateInfo*    modelInfo = nullptr,
-                      int                 readFileFlags = DEFAULT_READ_FILE_FLAGS);
+        static bool ReadFile(const string& filename, const aiScene*& output, unsigned int readFileFlags = DEFAULT_READ_FILE_FLAGS);
+        void UploadToGPU(const aiScene*& scene, const VertexLayout& vertexLayout, Command& command, ModelCreateInfo* modelInfo = nullptr);
     protected:
-        vector<Mesh> subMeshes;
-        VkDevice     device = nullptr;
-        Buffer       vertices;
-        Buffer       indices;
-        uint32_t     indexCount  = 0;
-        uint32_t     vertexCount = 0;
-        Dimension    dimension   = {};
+        vector<Mesh>  subMeshes;
+        const Device& device;
+        Buffer        vertices;
+        Buffer        indices;
+        //uint32_t     indexCount  = 0;
+        //uint32_t     vertexCount = 0;
+        Dimension     dimension   = {};
     };
 }
 

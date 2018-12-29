@@ -31,7 +31,7 @@ public:
         swapchain->orientationChanged = orientationChanged = true;
     }
 protected:
-    Renderer(void* genericWindow, uint32_t screenWidth, uint32_t screenheight);
+    Renderer(void* app, uint32_t screenWidth, uint32_t screenheight);
 
     virtual void RenderImpl() = 0;
 

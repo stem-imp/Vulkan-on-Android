@@ -8,7 +8,7 @@ using Vulkan::Command;
 class EmptySceneRenderer : public Renderer
 {
 public:
-    EmptySceneRenderer(void* genericWindow, uint32_t screenWidth, uint32_t screenHeight);
+    EmptySceneRenderer(void* app, uint32_t screenWidth, uint32_t screenHeight);
     ~EmptySceneRenderer() override;
 
     void RenderImpl() override;
