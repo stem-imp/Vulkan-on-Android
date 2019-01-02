@@ -1,27 +1,30 @@
 ﻿#ifndef VULKAN_MODEL_H
 #define VULKAN_MODEL_H
 
-#include "device.h"
-#include "buffer.h"
+#include "../../log/log.h"
+#include "../texture/texture.h"
 #include "glm/vec2.hpp"
 #include "glm/vec3.hpp"
-#include "glm/vec4.hpp"
+#include "glm/mat4x4.hpp"
 #include "assimp/Importer.hpp"
 #include "assimp/scene.h"
 #include "assimp/postprocess.h"
 #include <vector>
 #include <string>
+#include <unordered_map>
 
+using Utility::Log;
+using Vulkan::Texture;
+using Vulkan::Texture2D;
 using glm::vec2;
 using glm::vec3;
-using glm::vec4;
+using glm::mat4;
 using std::vector;
 using std::string;
-using Vulkan::Device;
-using Vulkan::Buffer;
+using std::unordered_map;
 
-namespace Vulkan {
-
+namespace Vulkan
+{
     typedef enum Component {
         VERTEX_COMPONENT_POSITION,
         VERTEX_COMPONENT_NORMAL,
@@ -35,6 +38,7 @@ namespace Vulkan {
     public:
         vector<Component> components;
 
+        VertexLayout() { DebugLog("VertexLayout"); }
         VertexLayout(vector<Component> other)
         {
             components = std::move(other);
@@ -82,14 +86,21 @@ namespace Vulkan {
 
     } ModelCreateInfo;
 
-    class Model {
+    class Model
+    {
     public:
-        struct Mesh {
-            uint32_t vertexBase;
-            uint32_t vertexCount;
-            uint32_t indexBase;
-            uint32_t indexCount;
-        };
+        Model() { DebugLog("Model()"); }
+        ~Model() { DebugLog("~Model()"); }
+        static const unsigned int DEFAULT_READ_FILE_FLAGS;
+
+        bool ReadFile(const string& filePath, const string& filename, unsigned int readFileFlags = DEFAULT_READ_FILE_FLAGS, ModelCreateInfo* modelInfo = nullptr);
+
+        const aiScene* scene;
+
+        typedef struct Mesh {
+            vector<float> vertexBuffer;
+            vector<uint32_t> indexBuffer;
+        } Mesh;
 
         typedef struct Dimension
         {
@@ -98,22 +109,34 @@ namespace Vulkan {
             vec3 size;
         } Dimension;
 
-        Model(const Device& device);
-        Model(Model&& other);
-        virtual ~Model();
+        const vector<Mesh>& Submeshes() const { return _subMeshes; }
+        const vector<VertexLayout>& VertexLayouts() const { return _vertexLayouts; }
+    private:
+        void ProcessNode(aiNode* node, const aiScene* scene);
+        void ProcessMesh(aiMesh* mesh, const aiScene* scene);
+        void LoadMaterialTextures(aiMaterial* mat, aiTextureType type, string typeName);
 
-        static const unsigned int DEFAULT_READ_FILE_FLAGS;
+        string               _filePath;
+        Assimp::Importer     _importer;
+        vector<Mesh>         _subMeshes;
+        vector<VertexLayout> _vertexLayouts;
+        Dimension            _dimension = {};
 
-        static bool ReadFile(const string& filename, const aiScene*& output, unsigned int readFileFlags = DEFAULT_READ_FILE_FLAGS);
-        void UploadToGPU(const aiScene*& scene, const VertexLayout& vertexLayout, Command& command, ModelCreateInfo* modelInfo = nullptr);
-    protected:
-        vector<Mesh>  subMeshes;
-        const Device& device;
-        Buffer        vertices;
-        Buffer        indices;
-        //uint32_t     indexCount  = 0;
-        //uint32_t     vertexCount = 0;
-        Dimension     dimension   = {};
+        vector<int> _materialIndices;
+        typedef struct MaterialTextures
+        {
+            MaterialTextures() {}
+            MaterialTextures(MaterialTextures&& other)
+            {
+                textures = std::move(other.textures);
+            }
+            unordered_map<int, vector<string>> textures;
+        } MaterialTextures;
+        vector<MaterialTextures> _materialTextures;
+
+        mat4 _model      = mat4(1);
+        mat4 _view       = mat4(1);
+        mat4 _projection = mat4(1);
     };
 }
 

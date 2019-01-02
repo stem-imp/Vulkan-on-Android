@@ -88,7 +88,8 @@ add_library( # Sets the name of the library.
         src/main/cpp/vulkan/framebuffer.cpp
         src/main/cpp/vulkan/command.cpp
         src/main/cpp/vulkan/buffer.cpp
-        src/main/cpp/vulkan/model.cpp
+        src/main/cpp/vulkan/model/model.cpp
+        src/main/cpp/vulkan/model/model_resource.cpp
 
         src/main/cpp/vulkan/android/vulkan_android.cpp
         src/main/cpp/vulkan/vulkan_utility.cpp

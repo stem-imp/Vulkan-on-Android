@@ -2,11 +2,13 @@
 #define EARTH_SCENE_RENDERER_H
 
 #include "../../renderer.h"
-#include "../../vulkan/model.h"
+#include "../../vulkan/model/model.h"
+#include "../../vulkan/model/model_resource.h"
 #include <vector>
 
 using Vulkan::Command;
 using Vulkan::Model;
+using Vulkan::ModelResource;
 using std::vector;
 
 class EarthSceneRenderer : public Renderer
@@ -20,7 +22,7 @@ private:
     // ==== Vulkan ==== //
     void BuildCommandBuffer(int index);
 
-    vector<Model> _models;
+    vector<ModelResource> _models;
 
     Command::CommandBuffers _commandBuffers;
     VkImage                 _depthImage;

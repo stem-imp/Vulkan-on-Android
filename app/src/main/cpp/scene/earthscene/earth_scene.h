@@ -2,7 +2,7 @@
 #define EARTH_SCENE_H
 
 #include "../scene.h"
-#include "../../vulkan/model.h"
+#include "../../vulkan/model/model_resource.h"
 #include <vector>
 
 class EarthScene : public Scene

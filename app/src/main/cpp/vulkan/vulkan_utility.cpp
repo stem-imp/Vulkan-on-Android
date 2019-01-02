@@ -475,9 +475,9 @@ VkSemaphore CreateSemaphore(VkDevice device, VkSemaphoreCreateFlags flags, const
 VkImageCreateInfo ImageCreateInfo(VkFormat              format,
                                   VkExtent3D            extent,
                                   uint32_t              mipLevels,
-                                  VkImageTiling         tiling,
                                   VkImageUsageFlags     usage,
 
+                                  VkImageTiling         tiling,
                                   VkImageLayout         initialLayout,
                                   VkSampleCountFlagBits samples,
                                   uint32_t              arrayLayers,

@@ -175,9 +175,9 @@ VkSemaphore CreateSemaphore(VkDevice device, VkSemaphoreCreateFlags flags = 0, c
 VkImageCreateInfo ImageCreateInfo(VkFormat              format,
                                   VkExtent3D            extent,
                                   uint32_t              mipLevels,
-                                  VkImageTiling         tiling,
                                   VkImageUsageFlags     usage,
 
+                                  VkImageTiling         tiling                 = VK_IMAGE_TILING_OPTIMAL,
                                   VkImageLayout         initialLayout          = VK_IMAGE_LAYOUT_UNDEFINED,
                                   VkSampleCountFlagBits samples                = VK_SAMPLE_COUNT_1_BIT,
                                   uint32_t              arrayLayers            = 1,
