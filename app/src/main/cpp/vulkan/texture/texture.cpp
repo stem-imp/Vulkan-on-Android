@@ -22,6 +22,12 @@ namespace Vulkan
         VK_CHECK_RESULT(vkAllocateMemory(d, &allocInfo, nullptr, &memory));
     }
 
+    void Texture::CreateImageView(const TextureAttribs& textureAttribs)
+    {
+        VkImageViewCreateInfo imageViewInfo = ImageViewCreateInfo(image, textureAttribs.format, { VK_IMAGE_ASPECT_COLOR_BIT, 0, textureAttribs.mipmapLevels, 0, 1 });
+        vkCreateImageView(device.LogicalDevice(), &imageViewInfo, nullptr, &view);
+    }
+
     void Texture::GenerateMipmaps(TextureAttribs& textureAttribs, Command& command, VkCommandBuffer commandBuffer)
     {
         VkFormatProperties formatProperties;

@@ -61,6 +61,7 @@ namespace Vulkan
         {
             VK_CHECK_RESULT(vkBindImageMemory(device.LogicalDevice(), image, memory, memoryOffset));
         }
+        void CreateImageView(const TextureAttribs& textureAttribs);
 
         void GenerateMipmaps(TextureAttribs& textureAttribs, Command& command, VkCommandBuffer commandBuffer);
 

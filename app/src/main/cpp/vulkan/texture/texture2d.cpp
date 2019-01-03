@@ -21,6 +21,7 @@ namespace Vulkan
         VkMemoryRequirements memRequirements;
         AllocateTexture(memRequirements, preferredProperties);
         BindTexture();
+        CreateImageView(textureAttribs);
 
         vector<VkCommandBuffer> cmds = Command::CreateAndBeginCommandBuffers(command.ShortLivedTransferPool(),
                                                                              VK_COMMAND_BUFFER_LEVEL_PRIMARY,
