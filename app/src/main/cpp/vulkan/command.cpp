@@ -159,7 +159,7 @@ vector<VkCommandBuffer> Command::CreateAndBeginCommandBuffers(VkCommandPool comm
     return commandBuffer;
 }
 
-void Command::EndAndSubmitCommandBuffer(VkCommandBuffer commandBuffer, VkQueue queue, VkCommandPool commandPool, VkDevice device)
+void Command::EndAndSubmitCommandBuffer(VkCommandBuffer commandBuffer, VkQueue queue, VkCommandPool commandPool, VkDevice device, bool free)
 {
     VK_CHECK_RESULT(vkEndCommandBuffer(commandBuffer));
     VkSubmitInfo submitInfo = {};
@@ -176,5 +176,9 @@ void Command::EndAndSubmitCommandBuffer(VkCommandBuffer commandBuffer, VkQueue q
     VK_CHECK_RESULT(vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX));
 
     vkDestroyFence(device, fence, nullptr);
-    vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+    if (free) {
+        vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+    } else {
+        VK_CHECK_RESULT(vkResetCommandBuffer(commandBuffer, 0));
+    }
 }

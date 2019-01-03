@@ -33,7 +33,7 @@ namespace Vulkan
                                                                     const void *pCreateNext = nullptr,
                                                                     const void *pBeginNext = nullptr);
 
-        static void EndAndSubmitCommandBuffer(VkCommandBuffer commandBuffer, VkQueue queue, VkCommandPool commandPool, VkDevice device);
+        static void EndAndSubmitCommandBuffer(VkCommandBuffer commandBuffer, VkQueue queue, VkCommandPool commandPool, VkDevice device, bool free = true);
 
         typedef struct CommandPools {
             int graphicsQueueIndex      = -1;
