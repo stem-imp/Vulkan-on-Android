@@ -583,6 +583,26 @@ VkImageViewCreateInfo ImageViewCreateInfo(VkImage                 image,
 }
 
 
+// ==== Buffer & Image ==== //
+VkBufferImageCopy BufferImageCopy(VkExtent3D               imageExtent,
+                                  VkImageSubresourceLayers imageSubresource,
+
+                                  VkDeviceSize             bufferOffset,
+                                  uint32_t                 bufferRowLength,
+                                  uint32_t                 bufferImageHeight,
+                                  VkOffset3D               imageOffset)
+{
+    VkBufferImageCopy bufferImageCopy = {};
+    bufferImageCopy.bufferOffset = bufferOffset;
+    bufferImageCopy.bufferRowLength = bufferRowLength;
+    bufferImageCopy.bufferImageHeight = bufferImageHeight;
+    bufferImageCopy.imageSubresource = imageSubresource;
+    bufferImageCopy.imageOffset = imageOffset;
+    bufferImageCopy.imageExtent = imageExtent;
+    return bufferImageCopy;
+}
+
+
 // ==== Pipeline ==== //
 VkGraphicsPipelineCreateInfo CreateGraphicsPipelineInfo(uint32_t                                      stageCount,
                                                         const VkPipelineShaderStageCreateInfo*        pStages,

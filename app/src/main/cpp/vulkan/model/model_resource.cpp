@@ -2,6 +2,7 @@
 #include "../../log/log.h"
 #include "../command.h"
 #include "../vulkan_utility.h"
+#include "../../androidutility/assetmanager/io_asset.hpp"
 
 using Utility::Log;
 
@@ -28,9 +29,9 @@ namespace Vulkan
 
     void ModelResource::UploadToGPU(const Model& model, Command& command)
     {
-        const aiScene* scene = model.scene;
+        // Upload model.
         subMeshes.clear();
-        subMeshes.resize(scene->mNumMeshes);
+        subMeshes.resize(model.Submeshes().size());
 
         const vector<VertexLayout>& vertexLayouts = model.VertexLayouts();
 
@@ -110,6 +111,7 @@ namespace Vulkan
         memcpy(indexStaging.mapped, indexBuffer.data(), iBufferSize);
         vertexStaging.Unmap();
         indexStaging.Unmap();
+
 
         vector<VkCommandBuffer> copyCmds = Command::CreateAndBeginCommandBuffers(command.ShortLivedTransferPool(),
                                                                                  VK_COMMAND_BUFFER_LEVEL_PRIMARY,

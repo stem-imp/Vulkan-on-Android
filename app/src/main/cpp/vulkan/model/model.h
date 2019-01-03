@@ -2,7 +2,6 @@
 #define VULKAN_MODEL_H
 
 #include "../../log/log.h"
-#include "../texture/texture.h"
 #include "glm/vec2.hpp"
 #include "glm/vec3.hpp"
 #include "glm/mat4x4.hpp"
@@ -14,8 +13,6 @@
 #include <unordered_map>
 
 using Utility::Log;
-using Vulkan::Texture;
-using Vulkan::Texture2D;
 using glm::vec2;
 using glm::vec3;
 using glm::mat4;
@@ -111,28 +108,30 @@ namespace Vulkan
 
         const vector<Mesh>& Submeshes() const { return _subMeshes; }
         const vector<VertexLayout>& VertexLayouts() const { return _vertexLayouts; }
+
+        typedef struct Material
+        {
+            Material() {}
+            Material(Material&& other)
+            {
+                textures = std::move(other.textures);
+            }
+            unordered_map<int, vector<string>> textures;
+        } Material;
+        const vector<Material>& Materials() const { return _materialTextures; }
     private:
         void ProcessNode(aiNode* node, const aiScene* scene);
         void ProcessMesh(aiMesh* mesh, const aiScene* scene);
         void LoadMaterialTextures(aiMaterial* mat, aiTextureType type, string typeName);
 
         string               _filePath;
-        Assimp::Importer     _importer;
+        //Assimp::Importer     _importer;
         vector<Mesh>         _subMeshes;
         vector<VertexLayout> _vertexLayouts;
         Dimension            _dimension = {};
 
-        vector<int> _materialIndices;
-        typedef struct MaterialTextures
-        {
-            MaterialTextures() {}
-            MaterialTextures(MaterialTextures&& other)
-            {
-                textures = std::move(other.textures);
-            }
-            unordered_map<int, vector<string>> textures;
-        } MaterialTextures;
-        vector<MaterialTextures> _materialTextures;
+        vector<int>      _materialIndices;
+        vector<Material> _materialTextures;
 
         mat4 _model      = mat4(1);
         mat4 _view       = mat4(1);

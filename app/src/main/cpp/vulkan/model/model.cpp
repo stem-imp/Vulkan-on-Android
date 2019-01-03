@@ -27,6 +27,7 @@ namespace Vulkan
         if ((readFileFlags & aiProcess_Triangulate) != aiProcess_Triangulate) {
             readFileFlags |= aiProcess_Triangulate;
         }
+        Assimp::Importer _importer;
         scene = _importer.ReadFile(filePath + filename, readFileFlags);
         _filePath = string(filePath.c_str());
         if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
@@ -173,7 +174,7 @@ namespace Vulkan
 
         aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
         _materialIndices.push_back(mesh->mMaterialIndex);
-        _materialTextures.emplace_back(MaterialTextures{});
+        _materialTextures.emplace_back(Material{});
 
 #ifndef NDEBUG
         aiReturn res;

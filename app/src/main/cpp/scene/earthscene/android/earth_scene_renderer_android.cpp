@@ -1,8 +1,11 @@
 ﻿#ifdef __ANDROID__
 
 #include "../earth_scene_renderer.h"
-#include "../../../vulkan/vulkan_utility.h"
 #include "../../../vulkan/renderpass/color_depth_renderpass.h"
+#include "../../../vulkan/texture/texture.h"
+#include "../../../vulkan/vulkan_utility.h"
+#include "../../../androidutility/assetmanager/io_asset.hpp"
+
 #include <unordered_map>
 #include <android_native_app_glue.h>
 
@@ -14,6 +17,9 @@ using Vulkan::RenderPass;
 using Vulkan::ColorDepthRenderPass;
 using Vulkan::Component;
 using std::unordered_map;
+
+using std::min;
+using std::max;
 
 static VkViewport viewport = { .x = 0.0f, .y = 0.0f, .minDepth = 0.0f, .maxDepth = 1.0f };
 static VkRect2D scissorRect = { .offset = { 0, 0 } };
@@ -55,7 +61,41 @@ EarthSceneRenderer::EarthSceneRenderer(void* application, uint32_t screenWidth, 
     // Load models.
     android_app* app = (android_app*)application;
     Model m;
-    if (m.ReadFile(string(app->activity->externalDataPath + string("/earth/")), string("earth.obj"))) {
+    string filePath = string(app->activity->externalDataPath) + string("/earth/");
+    if (m.ReadFile(filePath, string("earth.obj"))) {
+        //vector<uint8_t> fileContent;
+        Texture::TextureAttribs textureAttribs;
+        for (const auto& n : m.Materials()) {
+            for (const auto& it: n.textures) {
+                aiTextureType type = (aiTextureType)it.first;
+                switch (type) {
+                case aiTextureType_DIFFUSE:
+                    for (const auto& str : it.second) {
+//                        AndroidNative::Open<uint8_t>((string(filePath) + str).c_str(), app, fileContent);
+                        uint8_t* imageData = stbi_load((string(filePath) + str).c_str(),
+                                                       (int*)&textureAttribs.width,
+                                                       (int*)&textureAttribs.height,
+                                                       (int*)&textureAttribs.channelsPerPixel,
+                                                       STBI_rgb_alpha);
+//                        uint8_t* imageData = stbi_load_from_memory(fileContent.data(),
+//                                                                   fileContent.size(),
+//                                                                   (int*)&textureAttribs.width,
+//                                                                   (int*)&textureAttribs.height,
+//                                                                   (int*)&textureAttribs.channelsPerPixel,
+//                                                                   STBI_rgb_alpha);
+                        textureAttribs.mipmapLevels = (uint32_t)(floor(log2(max(textureAttribs.width, textureAttribs.height)))) + 1;
+                        _modelTextures.emplace_back(*device);
+                        _modelTextures[_modelTextures.size() - 1].BuildTexture2D(textureAttribs, imageData, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, *command);
+                    }
+                    break;
+                case aiTextureType_HEIGHT:
+                case aiTextureType_NORMALS:
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
         _models.emplace_back(*device);
         _models[_models.size() - 1].UploadToGPU(m, *command);
     }
@@ -130,6 +170,7 @@ EarthSceneRenderer::~EarthSceneRenderer()
 
     vkDeviceWaitIdle(d);
 
+    _modelTextures.clear();
     _models.clear();
 
     vkDestroyImageView(d, _depthView, nullptr);

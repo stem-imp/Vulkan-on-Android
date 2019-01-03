@@ -171,7 +171,7 @@ VkSemaphore CreateSemaphore(VkDevice device, VkSemaphoreCreateFlags flags = 0, c
 //                                     VkMemoryRequirements* memoryRequirements);
 
 
-// Image
+// ==== Image ==== //
 VkImageCreateInfo ImageCreateInfo(VkFormat              format,
                                   VkExtent3D            extent,
                                   uint32_t              mipLevels,
@@ -237,6 +237,16 @@ VkImageViewCreateInfo ImageViewCreateInfo(VkImage                 image,
                                           VkComponentMapping      components       = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A },
                                           const void*             pNext            = nullptr,
                                           VkImageViewCreateFlags  flags            = 0);
+
+
+// ==== Buffer & Image ==== //
+VkBufferImageCopy BufferImageCopy(VkExtent3D               imageExtent,
+                                  VkImageSubresourceLayers imageSubresource,
+
+                                  VkDeviceSize             bufferOffset      = 0,
+                                  uint32_t                 bufferRowLength   = 0,
+                                  uint32_t                 bufferImageHeight = 0,
+                                  VkOffset3D               imageOffset       = { 0, 0, 0 });
 
 
 // ==== Shader ==== //

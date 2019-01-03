@@ -4,11 +4,14 @@
 #include "../../renderer.h"
 #include "../../vulkan/model/model.h"
 #include "../../vulkan/model/model_resource.h"
+#include "../../vulkan/texture/texture.h"
 #include <vector>
 
 using Vulkan::Command;
 using Vulkan::Model;
 using Vulkan::ModelResource;
+using Vulkan::Texture;
+using Vulkan::Texture2D;
 using std::vector;
 
 class EarthSceneRenderer : public Renderer
@@ -23,6 +26,7 @@ private:
     void BuildCommandBuffer(int index);
 
     vector<ModelResource> _models;
+    vector<Texture2D>     _modelTextures;
 
     Command::CommandBuffers _commandBuffers;
     VkImage                 _depthImage;

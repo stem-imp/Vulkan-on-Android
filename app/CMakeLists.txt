@@ -61,7 +61,9 @@ add_definitions("-DGLM_FORCE_SIZE_T_LENGTH -DGLM_FORCE_RADIANS -DGLM_FORCE_DEPTH
 add_subdirectory(include/glm)
 
 # stb_image
-add_definitions("-DSTBI_ONLY_PNG")
+#add_definitions("-DSTB_IMAGE_IMPLEMENTATION")
+#add_definitions("-DSTBI_ONLY_JPEG")
+#add_definitions("-DSTBI_ONLY_PNG")
 
 add_library(assimp-lib SHARED IMPORTED)
 set_target_properties(assimp-lib PROPERTIES IMPORTED_LOCATION ${CMAKE_SOURCE_DIR}/libs/${ANDROID_ABI}/libassimp.so)
@@ -90,6 +92,8 @@ add_library( # Sets the name of the library.
         src/main/cpp/vulkan/buffer.cpp
         src/main/cpp/vulkan/model/model.cpp
         src/main/cpp/vulkan/model/model_resource.cpp
+        src/main/cpp/vulkan/texture/texture.cpp
+        src/main/cpp/vulkan/texture/texture2d.cpp
 
         src/main/cpp/vulkan/android/vulkan_android.cpp
         src/main/cpp/vulkan/vulkan_utility.cpp
