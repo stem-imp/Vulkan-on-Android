@@ -24,16 +24,14 @@ namespace Vulkan {
                           uint32_t            queueFamilyIndexCount = 0,
                           const uint32_t*     pQueueFamilyIndices   = nullptr);
 
-        void AllocateBuffer(VkDeviceSize          allocationSize,
-                            uint32_t              memoryTypeIndex,
-
-                            const void*           pNext              = nullptr,
-                            VkMemoryRequirements* memoryRequirements = nullptr);
+        void AllocateBuffer(VkMemoryRequirements& memoryRequirements, VkMemoryPropertyFlags preferredProperties, const void* pNext = nullptr);
 
         void BindBuffer(VkDeviceSize memoryOffset = 0)
         {
             VK_CHECK_RESULT(vkBindBufferMemory(_device.LogicalDevice(), _buffer, _memory, memoryOffset));
         }
+
+        void Free();
 
         typedef struct ExtendedBufferParameter
         {
@@ -55,10 +53,10 @@ namespace Vulkan {
         void BuildDefaultBuffer(VkDeviceSize          size,
                                 VkBufferUsageFlags    usage,
                                 VkMemoryPropertyFlags preferredProperties);
-        void BuildExtendedBuffer(VkDeviceSize          size,
-                                 VkBufferUsageFlags    usage,
-                                 VkMemoryPropertyFlags preferredProperties,
-                                 ExtendedBufferParameter extendedBufferParameter);
+        void BuildExtendedBuffer(VkDeviceSize             size,
+                                 VkBufferUsageFlags       usage,
+                                 VkMemoryPropertyFlags    preferredProperties,
+                                 ExtendedBufferParameter& extendedBufferParameter);
 
         void Map(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0)
         {
