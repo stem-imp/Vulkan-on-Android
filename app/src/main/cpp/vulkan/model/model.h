@@ -116,22 +116,23 @@ namespace Vulkan
             {
                 textures = std::move(other.textures);
             }
+
             unordered_map<int, vector<string>> textures;
         } Material;
-        const vector<Material>& Materials() const { return _materialTextures; }
+        const vector<Material>& Materials() const { return _materials; }
     private:
-        void ProcessNode(aiNode* node, const aiScene* scene);
-        void ProcessMesh(aiMesh* mesh, const aiScene* scene);
         void LoadMaterialTextures(aiMaterial* mat, aiTextureType type, string typeName);
 
-        string               _filePath;
-        //Assimp::Importer     _importer;
+        void ProcessNode(aiNode* node, const aiScene* scene);
+        void ProcessMesh(aiMesh* mesh, const aiScene* scene);
+        void LoadMaterialTextures(const aiMaterial* mat, aiTextureType type, int storeIndex);
+
         vector<Mesh>         _subMeshes;
         vector<VertexLayout> _vertexLayouts;
         Dimension            _dimension = {};
 
         vector<int>      _materialIndices;
-        vector<Material> _materialTextures;
+        vector<Material> _materials;
 
         mat4 _model      = mat4(1);
         mat4 _view       = mat4(1);

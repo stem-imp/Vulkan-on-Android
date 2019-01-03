@@ -63,36 +63,20 @@ EarthSceneRenderer::EarthSceneRenderer(void* application, uint32_t screenWidth, 
     Model m;
     string filePath = string(app->activity->externalDataPath) + string("/earth/");
     if (m.ReadFile(filePath, string("earth.obj"))) {
-        //vector<uint8_t> fileContent;
         Texture::TextureAttribs textureAttribs;
         for (const auto& n : m.Materials()) {
             for (const auto& it: n.textures) {
                 aiTextureType type = (aiTextureType)it.first;
-                switch (type) {
-                case aiTextureType_DIFFUSE:
-                    for (const auto& str : it.second) {
-//                        AndroidNative::Open<uint8_t>((string(filePath) + str).c_str(), app, fileContent);
-                        uint8_t* imageData = stbi_load((string(filePath) + str).c_str(),
-                                                       (int*)&textureAttribs.width,
-                                                       (int*)&textureAttribs.height,
-                                                       (int*)&textureAttribs.channelsPerPixel,
-                                                       STBI_rgb_alpha);
-//                        uint8_t* imageData = stbi_load_from_memory(fileContent.data(),
-//                                                                   fileContent.size(),
-//                                                                   (int*)&textureAttribs.width,
-//                                                                   (int*)&textureAttribs.height,
-//                                                                   (int*)&textureAttribs.channelsPerPixel,
-//                                                                   STBI_rgb_alpha);
-                        textureAttribs.mipmapLevels = (uint32_t)(floor(log2(max(textureAttribs.width, textureAttribs.height)))) + 1;
-                        _modelTextures.emplace_back(*device);
-                        _modelTextures[_modelTextures.size() - 1].BuildTexture2D(textureAttribs, imageData, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, *command);
-                    }
-                    break;
-                case aiTextureType_HEIGHT:
-                case aiTextureType_NORMALS:
-                    break;
-                default:
-                    break;
+                DebugLog("Texture Type: %d", type);
+                for (const auto& str : it.second) {
+                    uint8_t* imageData = stbi_load((string(filePath) + str).c_str(),
+                                                   (int*)&textureAttribs.width,
+                                                   (int*)&textureAttribs.height,
+                                                   (int*)&textureAttribs.channelsPerPixel,
+                                                   STBI_rgb_alpha);
+                    textureAttribs.mipmapLevels = (uint32_t)(floor(log2(max(textureAttribs.width, textureAttribs.height)))) + 1;
+                    _modelTextures.emplace_back(*device);
+                    _modelTextures[_modelTextures.size() - 1].BuildTexture2D(textureAttribs, imageData, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, *command);
                 }
             }
         }

@@ -27,16 +27,17 @@ namespace Vulkan
         if ((readFileFlags & aiProcess_Triangulate) != aiProcess_Triangulate) {
             readFileFlags |= aiProcess_Triangulate;
         }
-        Assimp::Importer _importer;
-        scene = _importer.ReadFile(filePath + filename, readFileFlags);
-        _filePath = string(filePath.c_str());
+        Assimp::Importer importer;
+        scene = importer.ReadFile(filePath + filename, readFileFlags);
         if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
         {
-            Log::Error("%s", _importer.GetErrorString());
+            Log::Error("%s", importer.GetErrorString());
             scene = nullptr;
             return false;
         }
+#ifndef NDEBUG
         ProcessNode(scene->mRootNode, scene);
+#endif
 
         _subMeshes.clear();
         _subMeshes.resize(scene->mNumMeshes);
@@ -141,8 +142,40 @@ namespace Vulkan
                 _subMeshes[i].indexBuffer.push_back(Face.mIndices[1]);
                 _subMeshes[i].indexBuffer.push_back(Face.mIndices[2]);
             }
+
+            _materialIndices.push_back(mesh->mMaterialIndex);
+        }
+
+        _materials.resize(scene->mNumMaterials);
+        for (int i = 0; i < scene->mNumMaterials; i++) {
+            aiMaterial* material = scene->mMaterials[i];
+            LoadMaterialTextures(material, aiTextureType_DIFFUSE     , i);
+            LoadMaterialTextures(material, aiTextureType_SPECULAR    , i);
+            LoadMaterialTextures(material, aiTextureType_AMBIENT     , i);
+            LoadMaterialTextures(material, aiTextureType_EMISSIVE    , i);
+            LoadMaterialTextures(material, aiTextureType_HEIGHT      , i);
+            LoadMaterialTextures(material, aiTextureType_NORMALS     , i);
+            LoadMaterialTextures(material, aiTextureType_SHININESS   , i);
+            LoadMaterialTextures(material, aiTextureType_OPACITY     , i);
+            LoadMaterialTextures(material, aiTextureType_DISPLACEMENT, i);
+            LoadMaterialTextures(material, aiTextureType_LIGHTMAP    , i);
+            LoadMaterialTextures(material, aiTextureType_REFLECTION  , i);
         }
         return true;
+    }
+
+    void Model::LoadMaterialTextures(const aiMaterial* mat, aiTextureType type, int storeIndex)
+    {
+        int textureCount = mat->GetTextureCount(type);
+        if (textureCount > 0) {
+            _materials[storeIndex].textures.insert({ (int)type, {} });
+        }
+        for (int i = 0; i < textureCount; i++) {
+            aiString path;
+            if (mat->GetTexture(type, i, &path) == aiReturn_SUCCESS) {
+                _materials[storeIndex].textures[(int) type].emplace_back(path.C_Str());
+            }
+        }
     }
 
     void Model::ProcessNode(aiNode* node, const aiScene* scene)
@@ -173,10 +206,6 @@ namespace Vulkan
         DebugLog("  indices num %d", tmp);
 
         aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
-        _materialIndices.push_back(mesh->mMaterialIndex);
-        _materialTextures.emplace_back(Material{});
-
-#ifndef NDEBUG
         aiReturn res;
         aiColor3D color3;
         int mode;
@@ -207,7 +236,6 @@ namespace Vulkan
         DebugLog("  %d shininess strength %f", res, valuef);
         res = material->Get(AI_MATKEY_REFRACTI, valuef);
         DebugLog("  %d refracti %f", res, valuef);
-#endif
 
         LoadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_diffuse");
         LoadMaterialTextures(material, aiTextureType_SPECULAR, "texture_specular");
@@ -226,17 +254,11 @@ namespace Vulkan
     {
         int textureCount = mat->GetTextureCount(type);
         DebugLog("  %d textures of type %s", textureCount, typeName.c_str());
-        if (textureCount > 0) {
-            _materialTextures[_materialTextures.size() - 1].textures.insert({ (int)type, {} });
-        }
         for (int i = 0; i < textureCount; i++) {
             aiString str1;
             aiReturn res1;
             res1 = mat->GetTexture(type, i, &str1);
-            _materialTextures[_materialTextures.size() - 1].textures[(int)type].emplace_back(str1.C_Str());
             DebugLog("  %d, %d, %s, PATH, %s", i, res1, typeName.c_str(), str1.C_Str());
-
-#ifndef NDEBUG
             aiString str2;
             aiReturn res2, res3, res4, res5, res6, res7, res8, res9, res10;
             float f3;
@@ -262,7 +284,6 @@ namespace Vulkan
             DebugLog("  %d, %d, %s, MAPPINGMODE_V, %d",         i, res8, typeName.c_str(), int8);
             DebugLog("  %d, %d, %s, TEXMAP_AXIS, (%f, %f, %f)", i, res9, typeName.c_str(), v3d9.x, v3d9.y, v3d9.z);
             DebugLog("  %d, %d, %s, TEXFLAGS, %d",              i, res10, typeName.c_str(), int10);
-#endif
         }
     }
 }
