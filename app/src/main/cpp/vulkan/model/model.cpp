@@ -56,59 +56,75 @@ namespace Vulkan
 
             _subMeshes[i] = {};
             _vertexLayouts[i].components.clear();
+            _vertexLayouts[i].offsets.clear();
+            bool hasPositions = mesh->HasPositions();
+            bool hasNormals = mesh->HasNormals();
+            bool hasUVs = mesh->HasTextureCoords(0);
+            aiColor3D pColor(0.f, 0.f, 0.f);
+            bool hasColors = (scene->mMaterials[mesh->mMaterialIndex]->Get(AI_MATKEY_COLOR_DIFFUSE, pColor) == aiReturn_SUCCESS);
+            bool hasTangentsAndBitangents = mesh->HasTangentsAndBitangents();
+            int baseOffset = 0;
+            if (hasPositions) {
+                _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_POSITION);
+                _vertexLayouts[i].offsets.push_back(3 * sizeof(float));
+                baseOffset += 3 * sizeof(float);
+            }
+            if (hasNormals) {
+                _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_NORMAL);
+                _vertexLayouts[i].offsets.push_back(baseOffset + 3 * sizeof(float));
+                baseOffset += 3 * sizeof(float);
+            }
+            if (hasUVs) {
+                _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_UV);
+                _vertexLayouts[i].offsets.push_back(baseOffset + 2 * sizeof(float));
+                baseOffset += 2 * sizeof(float);
+            }
+            if (hasColors) {
+                _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_COLOR);
+                _vertexLayouts[i].offsets.push_back(baseOffset + 3 * sizeof(float));
+                baseOffset += 3 * sizeof(float);
+            }
+            if (hasTangentsAndBitangents) {
+                _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_TANGENT);
+                _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_BITANGENT);
+                _vertexLayouts[i].offsets.push_back(baseOffset + 3 * sizeof(float));
+                baseOffset += 3 * sizeof(float);
+                _vertexLayouts[i].offsets.push_back(baseOffset + 3 * sizeof(float));
+            }
 
             for (uint32_t j = 0; j < mesh->mNumVertices; j++) {
                 aiVector3D* pos;
-                if (mesh->HasPositions()) {
+                if (hasPositions) {
                     pos = &(mesh->mVertices[j]);
                     _subMeshes[i].vertexBuffer.push_back(pos->x * scale.x);
                     _subMeshes[i].vertexBuffer.push_back(pos->y * scale.y);
                     _subMeshes[i].vertexBuffer.push_back(pos->z * scale.z);
-                    if (j == 0) {
-                        _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_POSITION);
-                    }
-                } else {
-                    pos = &ZERO3;
                 }
 
                 aiVector3D* normal;
-                if (mesh->HasPositions()) {
+                if (hasNormals) {
                     normal = &(mesh->mNormals[j]);
                     _subMeshes[i].vertexBuffer.push_back(normal->x);
                     _subMeshes[i].vertexBuffer.push_back(normal->y);
                     _subMeshes[i].vertexBuffer.push_back(normal->z);
-                    if (j == 0) {
-                        _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_NORMAL);
-                    }
-                } else {
-                    normal = &ZERO3;
                 }
 
                 aiVector3D* texCoord;
-                if (mesh->HasTextureCoords(0)) {
+                if (hasUVs) {
                     texCoord = &(mesh->mTextureCoords[0][j]);
                     _subMeshes[i].vertexBuffer.push_back(texCoord->x * uvScale.s);
                     _subMeshes[i].vertexBuffer.push_back(texCoord->y * uvScale.t);
-                    if (j == 0) {
-                        _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_UV);
-                    }
-                } else {
-                    texCoord = &ZERO3;
                 }
 
-                aiColor3D pColor(0.f, 0.f, 0.f);
-                if (scene->mMaterials[mesh->mMaterialIndex]->Get(AI_MATKEY_COLOR_DIFFUSE, pColor) == aiReturn_SUCCESS) {
+                if (hasColors) {
                     _subMeshes[i].vertexBuffer.push_back(pColor.r);
                     _subMeshes[i].vertexBuffer.push_back(pColor.g);
                     _subMeshes[i].vertexBuffer.push_back(pColor.b);
-                    if (j == 0) {
-                        _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_COLOR);
-                    }
                 }
 
-                const aiVector3D* tangent = (mesh->HasTangentsAndBitangents()) ? &(mesh->mTangents[j]) : &ZERO3;
-                const aiVector3D* biTangent = (mesh->HasTangentsAndBitangents()) ? &(mesh->mBitangents[j]) : &ZERO3;
-                if (mesh->HasTangentsAndBitangents()) {
+                const aiVector3D* tangent;
+                const aiVector3D* biTangent;
+                if (hasTangentsAndBitangents) {
                     tangent = &(mesh->mTangents[j]);
                     _subMeshes[i].vertexBuffer.push_back(tangent->x);
                     _subMeshes[i].vertexBuffer.push_back(tangent->y);
@@ -117,12 +133,6 @@ namespace Vulkan
                     _subMeshes[i].vertexBuffer.push_back(biTangent->x);
                     _subMeshes[i].vertexBuffer.push_back(biTangent->y);
                     _subMeshes[i].vertexBuffer.push_back(biTangent->z);
-                    if (j == 0) {
-                        _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_TANGENT);
-                        _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_BITANGENT);
-                    }
-                } else {
-                    biTangent = texCoord = &ZERO3;
                 }
 
                 _dimension.max.x = fmax(pos->x, _dimension.max.x);

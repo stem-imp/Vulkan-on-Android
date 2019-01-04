@@ -34,6 +34,7 @@ namespace Vulkan
     struct VertexLayout {
     public:
         vector<Component> components;
+        vector<int> offsets;
 
         VertexLayout() { DebugLog("VertexLayout"); }
         VertexLayout(vector<Component> other)
@@ -42,7 +43,7 @@ namespace Vulkan
         }
 
         template <typename T>
-        uint32_t Stride()
+        uint32_t Stride() const
         {
             uint32_t res = 0;
             for (auto& component : components)
