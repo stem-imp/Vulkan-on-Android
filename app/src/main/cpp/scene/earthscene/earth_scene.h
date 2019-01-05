@@ -2,7 +2,6 @@
 #define EARTH_SCENE_H
 
 #include "../scene.h"
-#include "../../vulkan/model/model_resource.h"
 #include <vector>
 
 class EarthScene : public Scene
@@ -13,6 +12,5 @@ public:
 
     bool UpdateImpl() override;
 };
-
 
 #endif // EARTH_SCENE_H

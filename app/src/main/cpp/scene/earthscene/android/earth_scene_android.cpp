@@ -5,6 +5,9 @@
 #include "../../../log/log.h"
 #include "../earth_scene_renderer.h"
 
+using std::chrono::duration;
+using std::chrono::seconds;
+
 static bool OnActivate();
 static void OnDeactivate();
 
@@ -70,6 +73,10 @@ EarthScene::~EarthScene()
 
 bool EarthScene::UpdateImpl()
 {
+    static EarthSceneRenderer* concreteRenderer = (EarthSceneRenderer*)renderer;
+    auto now = high_resolution_clock::now();
+    float elapsedTime = duration<float, seconds::period>(now - startTime).count();
+    concreteRenderer->UpdateMVP(elapsedTime);
     return true;
 }
 

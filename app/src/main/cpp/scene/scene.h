@@ -9,6 +9,9 @@ using AndroidNative::EventLoop;
 #endif
 
 #include "../renderer.h"
+#include <chrono>
+
+using std::chrono::high_resolution_clock;
 
 class Scene
 {
@@ -25,7 +28,10 @@ protected:
 #endif
     Renderer* renderer;
 
-    timespec startTime;
+    high_resolution_clock::time_point startTime;
+    high_resolution_clock::time_point intervalBaseTime;
+    high_resolution_clock::time_point currentTime;
+    float                             deltaTime;
 };
 
 #endif // APP_SCENE_H
