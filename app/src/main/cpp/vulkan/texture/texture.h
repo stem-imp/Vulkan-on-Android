@@ -33,8 +33,10 @@ namespace Vulkan
             return ArrayLayersImpl();
         }
 
+        const VkImageView& ImageView() const { return view; }
+
     protected:
-        Texture(const Device& device) : device(device) {}
+        Texture(const Device& device) : device(device) { DebugLog("Texture()"); }
         ~Texture()
         {
             DebugLog("~Texture()");
@@ -44,15 +46,15 @@ namespace Vulkan
                 vkDestroyImageView (d, view, nullptr);
                 view = VK_NULL_HANDLE;
             }
-            if (memory != VK_NULL_HANDLE) {
-                DebugLog("~Texture() vkFreeMemory()");
-                vkFreeMemory(d, memory, nullptr);
-                memory = VK_NULL_HANDLE;
-            }
             if (image != VK_NULL_HANDLE) {
                 DebugLog("~Texture() vkDestroyImage()");
                 vkDestroyImage(d, image, nullptr);
                 image = VK_NULL_HANDLE;
+            }
+            if (memory != VK_NULL_HANDLE) {
+                DebugLog("~Texture() vkFreeMemory()");
+                vkFreeMemory(d, memory, nullptr);
+                memory = VK_NULL_HANDLE;
             }
         }
 
@@ -77,7 +79,14 @@ namespace Vulkan
     class Texture2D : public Texture
     {
     public:
-        Texture2D(const Device& device) : Texture(device) {}
+        Texture2D(const Device& device) : Texture(device) { DebugLog("Texture2D()"); }
+        Texture2D(Texture2D&& other) : Texture(other.device)
+        {
+            DebugLog("Texture2D(Texture2D&&)");
+            view   = other.view  , other.view   = VK_NULL_HANDLE;
+            image  = other.image , other.image  = VK_NULL_HANDLE;
+            memory = other.memory, other.memory = VK_NULL_HANDLE;
+        }
         ~Texture2D()
         {
             DebugLog("~Texture2D()");
