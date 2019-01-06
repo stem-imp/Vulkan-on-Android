@@ -44,12 +44,17 @@ namespace Vulkan
         virtual ~ModelResource();
 
         void UploadToGPU(const Model& model, Command& command);
+
+        const Buffer& VertexBuffer() const { return vertices; }
+        const Buffer& IndexBuffer() const { return indices; }
+        uint32_t IndicesCount() { return indicesCount; }
     protected:
         vector<Mesh>  subMeshes;
         const Device& device;
         Buffer        vertices;
         Buffer        indices;
-        Dimension     dimension   = {};
+        uint32_t      indicesCount;
+        Dimension     dimension = {};
     };
 }
 

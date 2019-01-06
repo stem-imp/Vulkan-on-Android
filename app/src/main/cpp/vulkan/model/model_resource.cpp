@@ -97,14 +97,14 @@ namespace Vulkan
 
         uint32_t vBufferSize = static_cast<uint32_t>(vertexBuffer.size()) * sizeof(float);
         uint32_t iBufferSize = static_cast<uint32_t>(indexBuffer.size()) * sizeof(uint32_t);
+        indicesCount = indexBuffer.size();
 
         Buffer vertexStaging(device), indexStaging(device);
         vertexStaging.BuildDefaultBuffer(vBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         indexStaging.BuildDefaultBuffer(iBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-        vertices.BuildDefaultBuffer(vBufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        indices.BuildDefaultBuffer(iBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        vertices.BuildDefaultBuffer(vBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        indices.BuildDefaultBuffer(iBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-        VkDevice d = device.LogicalDevice();
         vertexStaging.Map();
         indexStaging.Map();
         memcpy(vertexStaging.mapped, vertexBuffer.data(), vBufferSize);
@@ -113,6 +113,7 @@ namespace Vulkan
         indexStaging.Unmap();
 
 
+        VkDevice d = device.LogicalDevice();
         vector<VkCommandBuffer> copyCmds = Command::CreateAndBeginCommandBuffers(command.ShortLivedTransferPool(),
                                                                                  VK_COMMAND_BUFFER_LEVEL_PRIMARY,
                                                                                  1,
@@ -121,10 +122,10 @@ namespace Vulkan
         VkCommandBuffer copyCmd = copyCmds[0];
         VkBufferCopy copyRegion = {};
 
-        copyRegion.size = VK_WHOLE_SIZE;
+        copyRegion.size = vBufferSize;
         vkCmdCopyBuffer(copyCmd, vertexStaging.GetBuffer(), vertices.GetBuffer(), 1, &copyRegion);
 
-        copyRegion.size = VK_WHOLE_SIZE;
+        copyRegion.size = iBufferSize;
         vkCmdCopyBuffer(copyCmd, indexStaging.GetBuffer(), indices.GetBuffer(), 1, &copyRegion);
 
         Command::EndAndSubmitCommandBuffer(copyCmd, device.FamilyQueues().transfer.queue, command.ShortLivedTransferPool(), d);

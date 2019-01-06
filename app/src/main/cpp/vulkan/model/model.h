@@ -81,6 +81,12 @@ namespace Vulkan
 
     } ModelCreateInfo;
 
+    typedef struct MVP {
+        mat4 model      = mat4(1.0f);
+        mat4 view       = mat4(1.0f);
+        mat4 projection = mat4(1.0f);
+    } MVP;
+
     class Model
     {
     public:
@@ -144,9 +150,7 @@ namespace Vulkan
         vector<int>      _materialIndices;
         vector<Material> _materials;
 
-        mat4 _model      = mat4(1);
-        mat4 _view       = mat4(1);
-        mat4 _projection = mat4(1);
+        MVP _mvp;
     };
 }
 
