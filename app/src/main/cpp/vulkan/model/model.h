@@ -34,7 +34,7 @@ namespace Vulkan
     struct VertexLayout {
     public:
         vector<Component> components;
-        vector<int> offsets;
+        vector<uint32_t> offsets;
 
         VertexLayout() { DebugLog("VertexLayout"); }
         VertexLayout(vector<Component> other)
@@ -42,7 +42,6 @@ namespace Vulkan
             components = std::move(other);
         }
 
-        template <typename T>
         uint32_t Stride() const
         {
             uint32_t res = 0;
@@ -51,12 +50,10 @@ namespace Vulkan
                 switch (component)
                 {
                     case VERTEX_COMPONENT_UV:
-                        res += 2 * sizeof(T);
+                        res += 2 * sizeof(float);
                         break;
-                    case VERTEX_COMPONENT_COLOR:
-                        res += 4 * sizeof(T);
                     default:
-                        res += 3 * sizeof(T);
+                        res += 3 * sizeof(float);
                         break;
                 }
             }
@@ -88,6 +85,17 @@ namespace Vulkan
     {
     public:
         Model() { DebugLog("Model()"); }
+        Model(Model&& other)
+        {
+            DebugLog("Model(Model&&)");
+            scene            = other.scene, scene = nullptr;
+            _subMeshes       = std::move(other._subMeshes);
+            _vertexLayouts   = std::move(other._vertexLayouts);
+            _dimension       = other._dimension;
+            _materialIndices = std::move(other._materialIndices);
+            _materials       = std::move(other._materials);
+            _mvp             = other._mvp;
+        }
         ~Model() { DebugLog("~Model()"); }
         static const unsigned int DEFAULT_READ_FILE_FLAGS;
 
@@ -112,9 +120,10 @@ namespace Vulkan
 
         typedef struct Material
         {
-            Material() {}
+            Material() { DebugLog("Material()"); }
             Material(Material&& other)
             {
+                { DebugLog("Material(Material&&)"); }
                 textures = std::move(other.textures);
             }
 

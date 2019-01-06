@@ -66,30 +66,30 @@ namespace Vulkan
             int baseOffset = 0;
             if (hasPositions) {
                 _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_POSITION);
-                _vertexLayouts[i].offsets.push_back(3 * sizeof(float));
+                _vertexLayouts[i].offsets.push_back(baseOffset);
                 baseOffset += 3 * sizeof(float);
             }
             if (hasNormals) {
                 _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_NORMAL);
-                _vertexLayouts[i].offsets.push_back(baseOffset + 3 * sizeof(float));
+                _vertexLayouts[i].offsets.push_back(baseOffset);
                 baseOffset += 3 * sizeof(float);
             }
             if (hasUVs) {
                 _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_UV);
-                _vertexLayouts[i].offsets.push_back(baseOffset + 2 * sizeof(float));
+                _vertexLayouts[i].offsets.push_back(baseOffset);
                 baseOffset += 2 * sizeof(float);
             }
             if (hasColors) {
                 _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_COLOR);
-                _vertexLayouts[i].offsets.push_back(baseOffset + 3 * sizeof(float));
+                _vertexLayouts[i].offsets.push_back(baseOffset);
                 baseOffset += 3 * sizeof(float);
             }
             if (hasTangentsAndBitangents) {
                 _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_TANGENT);
                 _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_BITANGENT);
-                _vertexLayouts[i].offsets.push_back(baseOffset + 3 * sizeof(float));
+                _vertexLayouts[i].offsets.push_back(baseOffset);
                 baseOffset += 3 * sizeof(float);
-                _vertexLayouts[i].offsets.push_back(baseOffset + 3 * sizeof(float));
+                _vertexLayouts[i].offsets.push_back(baseOffset);
             }
 
             for (uint32_t j = 0; j < mesh->mNumVertices; j++) {
