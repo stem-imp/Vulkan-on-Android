@@ -5,7 +5,7 @@ using std::chrono::seconds;
 
 Scene::Scene(void* state) : eventLoop((android_app*)state)
 {
-    intervalBaseTime = currentTime = high_resolution_clock::now();
+    startTime = intervalBaseTime = currentTime = high_resolution_clock::now();
 }
 
 bool Scene::Update()
