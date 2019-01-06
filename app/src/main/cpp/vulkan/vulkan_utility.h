@@ -249,6 +249,26 @@ VkBufferImageCopy BufferImageCopy(VkExtent3D               imageExtent,
                                   VkOffset3D               imageOffset       = { 0, 0, 0 });
 
 
+// ==== Sampler ==== //
+VkSamplerCreateInfo SamplerCreateInfo(VkSamplerMipmapMode  mipmapMode,
+                                      float                maxLod,
+                                      VkSamplerAddressMode addressModeU,
+                                      VkSamplerAddressMode addressModeV,
+                                      VkSamplerAddressMode addressModeW,
+                                      float                maxAnisotropy,
+
+                                      VkFilter             magFilter                = VK_FILTER_LINEAR,
+                                      VkFilter             minFilter                = VK_FILTER_LINEAR,
+                                      float                mipLodBias               = 0,
+                                      VkBool32             compareEnable            = VK_FALSE,
+                                      VkCompareOp          compareOp                = VK_COMPARE_OP_ALWAYS,
+                                      float                minLod                   = 0,
+                                      VkBorderColor        borderColor              = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK,
+                                      VkBool32             unnormalizedCoordinates  = VK_FALSE,
+                                      VkSamplerCreateFlags flags                    = 0,
+                                      const void*          pNext                    = nullptr);
+
+
 // ==== Shader ==== //
 template <typename T>
 VkShaderModuleCreateInfo ShaderModuleCreateInfo(vector<T>& fileContent)
@@ -260,8 +280,77 @@ VkShaderModuleCreateInfo ShaderModuleCreateInfo(vector<T>& fileContent)
     return shaderModuleInfo;
 }
 
+VkPipelineShaderStageCreateInfo PipelineShaderStageCreateInfo(VkShaderStageFlagBits stage,
+                                                              const VkShaderModule& module,
+
+                                                              const char* pName                               = "main",
+                                                              const VkSpecializationInfo* pSpecializationInfo = nullptr,
+                                                              const void* pNext                               = nullptr);
+
+
+// ==== Pipeline & Descriptor ==== //
+VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo(uint32_t                     setLayoutCount,
+                                                    const VkDescriptorSetLayout* pSetLayouts,
+                                                    uint32_t                     pushConstantRangeCount,
+                                                    const VkPushConstantRange*   pPushConstantRanges,
+
+                                                    const void*                  pNext = nullptr,
+                                                    VkPipelineLayoutCreateFlags  flags = 0);
+
 
 // ==== Pipeline ==== //
+VkPipelineVertexInputStateCreateInfo PipelineVertexInputStateCreateInfo(uint32_t                                 vertexBindingDescriptionCount,
+                                                                        const VkVertexInputBindingDescription*   pVertexBindingDescriptions,
+                                                                        uint32_t                                 vertexAttributeDescriptionCount,
+                                                                        const VkVertexInputAttributeDescription* pVertexAttributeDescriptions,
+
+                                                                        const void*                              pNext = nullptr);
+
+VkViewport Viewport(float width, float height, float x = 0, float y = 0, float minDepth = 0.0f, float maxDepth = 1.0f);
+VkPipelineViewportStateCreateInfo PipelineViewport(const VkViewport* pViewports,
+                                                   const VkRect2D* pScissors,
+
+                                                   uint32_t viewportCount                   = 1,
+                                                   uint32_t scissorCount                    = 1,
+                                                   const void* pNext                        = nullptr,
+                                                   VkPipelineViewportStateCreateFlags flags = 0);
+
+VkPipelineRasterizationStateCreateInfo Rasterization(VkPolygonMode                           polygonMode,
+                                                     VkCullModeFlags                         cullMode,
+                                                     VkFrontFace                             frontFace,
+
+                                                     VkBool32                                rasterizerDiscardEnable = VK_FALSE,
+                                                     VkBool32                                depthClampEnable        = VK_FALSE,
+                                                     VkBool32                                depthBiasEnable         = VK_FALSE,
+                                                     float                                   depthBiasConstantFactor = 0.0f,
+                                                     float                                   depthBiasClamp          = 0.0f,
+                                                     float                                   depthBiasSlopeFactor    = 0.0f,
+                                                     float                                   lineWidth               = 1.0f,
+                                                     const void*                             pNext                   = nullptr,
+                                                     VkPipelineRasterizationStateCreateFlags flags                   = 0); // flags is reserved for future use
+
+VkPipelineDepthStencilStateCreateInfo DepthStencil(VkBool32                               depthTestEnable       = VK_TRUE,
+                                                   VkBool32                               depthWriteEnable      = VK_TRUE,
+                                                   VkCompareOp                            depthCompareOp        = VK_COMPARE_OP_LESS,
+                                                   VkBool32                               depthBoundsTestEnable = VK_FALSE,
+                                                   VkBool32                               stencilTestEnable     = VK_FALSE,
+                                                   VkStencilOpState                       front                 = {},
+                                                   VkStencilOpState                       back                  = {},
+                                                   float                                  minDepthBounds        = 0,
+                                                   float                                  maxDepthBounds        = 0,
+
+                                                   const void*                            pNext = nullptr,
+                                                   VkPipelineDepthStencilStateCreateFlags flags = 0); // flags is reserved for future use.
+
+VkPipelineColorBlendStateCreateInfo ColorBlend(VkBool32                                   logicOpEnable,
+                                               VkLogicOp                                  logicOp,
+                                               uint32_t                                   attachmentCount,
+                                               const VkPipelineColorBlendAttachmentState* pAttachments,
+                                               float                                      blendConstants[4],
+
+                                               const void*                                pNext = nullptr,
+                                               VkPipelineColorBlendStateCreateFlags       flags = 0); // flags is reserved for future use.
+
 typedef struct GraphicsPipelineInfoParameters {
     const VkPipelineDepthStencilStateCreateInfo* pDepthStencilState = nullptr;
     const VkPipelineMultisampleStateCreateInfo*  pMultisampleState  = nullptr;
@@ -273,7 +362,7 @@ typedef struct GraphicsPipelineInfoParameters {
     const void*                                  pNext              = nullptr;
     VkPipelineCreateFlags                        flags              = 0;
 } GraphicsPipelineInfoParameters;
-VkGraphicsPipelineCreateInfo CreateGraphicsPipelineInfo(uint32_t                                      stageCount,
+VkGraphicsPipelineCreateInfo GraphicsPipelineCreateInfo(uint32_t                                      stageCount,
                                                         const VkPipelineShaderStageCreateInfo*        pStages,
                                                         const VkPipelineVertexInputStateCreateInfo*   pVertexInputState,
                                                         const VkPipelineInputAssemblyStateCreateInfo* pInputAssemblyState,
@@ -283,11 +372,7 @@ VkGraphicsPipelineCreateInfo CreateGraphicsPipelineInfo(uint32_t                
                                                         VkPipelineLayout                              layout,
                                                         VkRenderPass                                  renderPass,
                                                         GraphicsPipelineInfoParameters                optionalParameters = GraphicsPipelineInfoParameters());
-VkPipeline CreateGraphicsPipelines(VkDevice                            device,
-                                   const VkGraphicsPipelineCreateInfo* pCreateInfos,
-                                   uint32_t                            createInfoCount = 1,
-                                   VkPipelineCache                     pipelineCache   = VK_NULL_HANDLE,
-                                   const VkAllocationCallbacks*        pAllocator      = nullptr);
+
 //
 //VkPipeline BuildDefaultGraphicsPipeline()
 //{
