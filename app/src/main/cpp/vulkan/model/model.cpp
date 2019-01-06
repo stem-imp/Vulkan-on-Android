@@ -79,17 +79,17 @@ namespace Vulkan
                 _vertexLayouts[i].offsets.push_back(baseOffset);
                 baseOffset += 2 * sizeof(float);
             }
-            if (hasColors) {
-                _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_COLOR);
-                _vertexLayouts[i].offsets.push_back(baseOffset);
-                baseOffset += 3 * sizeof(float);
-            }
             if (hasTangentsAndBitangents) {
                 _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_TANGENT);
                 _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_BITANGENT);
                 _vertexLayouts[i].offsets.push_back(baseOffset);
                 baseOffset += 3 * sizeof(float);
                 _vertexLayouts[i].offsets.push_back(baseOffset);
+            }
+            if (hasColors) {
+                _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_COLOR);
+                _vertexLayouts[i].offsets.push_back(baseOffset);
+                baseOffset += 3 * sizeof(float);
             }
 
             for (uint32_t j = 0; j < mesh->mNumVertices; j++) {
@@ -116,12 +116,6 @@ namespace Vulkan
                     _subMeshes[i].vertexBuffer.push_back(texCoord->y * uvScale.t);
                 }
 
-                if (hasColors) {
-                    _subMeshes[i].vertexBuffer.push_back(pColor.r);
-                    _subMeshes[i].vertexBuffer.push_back(pColor.g);
-                    _subMeshes[i].vertexBuffer.push_back(pColor.b);
-                }
-
                 const aiVector3D* tangent;
                 const aiVector3D* biTangent;
                 if (hasTangentsAndBitangents) {
@@ -133,6 +127,12 @@ namespace Vulkan
                     _subMeshes[i].vertexBuffer.push_back(biTangent->x);
                     _subMeshes[i].vertexBuffer.push_back(biTangent->y);
                     _subMeshes[i].vertexBuffer.push_back(biTangent->z);
+                }
+
+                if (hasColors) {
+                    _subMeshes[i].vertexBuffer.push_back(pColor.r);
+                    _subMeshes[i].vertexBuffer.push_back(pColor.g);
+                    _subMeshes[i].vertexBuffer.push_back(pColor.b);
                 }
 
                 _dimension.max.x = fmax(pos->x, _dimension.max.x);

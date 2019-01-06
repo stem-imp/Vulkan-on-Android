@@ -384,12 +384,12 @@ void EarthSceneRenderer::BuildDescriptorSet()
 
     VkDescriptorImageInfo imageInfo = {};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageInfo.imageView = _modelTextures[0].ImageView();
+    imageInfo.imageView = _modelTextures[1].ImageView(); // diffuse texture
     imageInfo.sampler = _diffuseSampler;
 
     VkDescriptorImageInfo imageInfo1 = {};
     imageInfo1.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageInfo1.imageView = _modelTextures[1].ImageView();
+    imageInfo1.imageView = _modelTextures[0].ImageView(); // normal texture
     imageInfo1.sampler = _diffuseSampler;
 
     VkWriteDescriptorSet descriptorWrites[] = { {}, {}, {} };
@@ -522,8 +522,8 @@ void EarthSceneRenderer::RenderImpl()
 void EarthSceneRenderer::UpdateMVP(float elapsedTime)
 {
     MVP mvp;
-    mvp.model = glm::rotate(mat4(1.0f), glm::radians(elapsedTime * 0.125f), vec3(0.0f, 1.0f, 0.0f));
-    mvp.view = glm::lookAt(vec3(0.0f, 0.0f, 32.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    mvp.model = glm::rotate(mat4(1.0f), glm::radians(elapsedTime * 16.0f), vec3(0.0f, 1.0f, 0.0f));
+    mvp.view = glm::lookAt(vec3(0.0f, 0.0f, 24.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
     mvp.projection = glm::perspective(glm::radians(90.0f), swapchain->Extent().width / (float)swapchain->Extent().height, 0.125f, 96.0f);
     mvp.projection[1][1] *= -1;
     std::copy((uint8_t*)&mvp, (uint8_t*)&mvp + sizeof(MVP), (uint8_t*)_buffers[0].mapped);
