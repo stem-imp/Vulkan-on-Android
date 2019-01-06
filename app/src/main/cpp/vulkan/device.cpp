@@ -281,14 +281,6 @@ namespace Vulkan {
         return VK_SAMPLE_COUNT_1_BIT;
     }
 
-    void Device::RequestSampleCount(VkSampleCountFlagBits& sampleCount)
-    {
-        VkSampleCountFlagBits maxSampleCount = GetMaxUsableSampleCount();
-        if (sampleCount > maxSampleCount) {
-            sampleCount = maxSampleCount;
-        }
-    }
-
     const vector<const char*> Device::EnabledDeviceExtensionNames() const
     {
         vector<const char*> ret = {};

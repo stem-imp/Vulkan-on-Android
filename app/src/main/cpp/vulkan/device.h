@@ -37,8 +37,22 @@ namespace Vulkan
         bool EnableDeviceExtensions(const vector<const char*>& extensionNames);
         bool IsDeviceExtensionSupported(const char* extensionName) const;
 
-        const VkPhysicalDeviceFeatures FeaturesSupported() const { return _featuresSupported; }
-        void RequestSampleCount(VkSampleCountFlagBits& sampleCount);
+        const VkPhysicalDeviceFeatures& FeaturesSupported() const { return _featuresSupported; }
+        const VkPhysicalDeviceFeatures& FeaturesEnabled() const { return _featuresEnabled; }
+        void RequestSampleCount(VkSampleCountFlagBits& sampleCount)
+        {
+            VkSampleCountFlagBits maxSampleCount = GetMaxUsableSampleCount();
+            if (sampleCount > maxSampleCount) {
+                sampleCount = maxSampleCount;
+            }
+        }
+
+        void RequsetSamplerAnisotropy(float& samplerAnisotropy)
+        {
+            if (samplerAnisotropy > _properties.limits.maxSamplerAnisotropy) {
+                samplerAnisotropy = _properties.limits.maxSamplerAnisotropy;
+            }
+        }
 
         void BuildDevice(const VkPhysicalDeviceFeatures& requestedFeatures, const vector<const char*>& requestedExtensions);
 
@@ -67,6 +81,7 @@ namespace Vulkan
         VkPhysicalDeviceFeatures         _featuresEnabled;
         VkPhysicalDeviceMemoryProperties _memoryProperties;
         VkSampleCountFlagBits            _sampleCount;
+        float                            _maxSamplerAnisotropy;
 
         vector<VkQueueFamilyProperties> _queueFamilyProperties;
         //std::unordered_map<VkDevice, QueueGroup> _familyQueuesGroup;
