@@ -21,12 +21,28 @@ public:
     ~EarthSceneRenderer() override;
 
     void RenderImpl() override;
+
+    void UpdateMVP(float elapsedTime);
+
+    vector<Model> models;
 private:
     // ==== Vulkan ==== //
+    void BuildDescriptorSetLayout();
+    void BuildDescriptorPool();
+    void BuildDescriptorSet();
     void BuildCommandBuffer(int index);
 
-    vector<ModelResource> _models;
+    vector<ModelResource> _modelResources;
     vector<Texture2D>     _modelTextures;
+    VkSampler             _diffuseSampler;
+    vector<Buffer>        _buffers;
+
+    VkDescriptorSetLayout _descriptorSetLayout;
+    VkDescriptorPool      _descriptorPool;
+    VkDescriptorSet       _descriptorSet;
+
+    VkPipelineLayout      _pipelineLayout;
+    VkPipeline            _pipeline;
 
     Command::CommandBuffers _commandBuffers;
     VkImage                 _depthImage;

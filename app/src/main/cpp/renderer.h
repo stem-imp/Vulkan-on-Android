@@ -9,6 +9,7 @@
 #include "vulkan/renderpass/renderpass.h"
 #include "vulkan/framebuffer.h"
 #include "vulkan/command.h"
+#include "vulkan/buffer.h"
 #include <vector>
 #include <stdexcept>
 
