@@ -624,8 +624,8 @@
 //void CreateGraphicsPipeline(PipelineInfo& pipelineInfo, android_app* app, const DeviceInfo& deviceInfo, SwapchainInfo& swapchainInfo, VkRenderPass& renderPass)
 //{
 //    // Create shader stage.
-//    VkShaderModule vertexShader = LoadShaderFromFile("shaders/triangle.vert.spv", app, deviceInfo);
-//    VkShaderModule fragmentShader = LoadShaderFromFile("shaders/triangle.frag.spv", app, deviceInfo);
+//    VkShaderModule vertexShader = LoadShaderFromFile("shaders/phong_shading.vert.spv", app, deviceInfo);
+//    VkShaderModule fragmentShader = LoadShaderFromFile("shaders/phong_shading.frag.spv", app, deviceInfo);
 //    VkPipelineShaderStageCreateInfo shaderStages[] = {
 //        {
 //            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,

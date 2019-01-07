@@ -196,8 +196,8 @@ EarthSceneRenderer::EarthSceneRenderer(void* application, uint32_t screenWidth, 
 
     // Prepare graphics pipeline.
     vector<char*> vertFile, fragFile;
-    AndroidNative::Open<char*>("shaders/triangle.vert.spv", app, vertFile);
-    AndroidNative::Open<char*>("shaders/triangle.frag.spv", app, fragFile);
+    AndroidNative::Open<char*>("shaders/phong_shading.vert.spv", app, vertFile);
+    AndroidNative::Open<char*>("shaders/phong_shading.frag.spv", app, fragFile);
     VkShaderModuleCreateInfo vertModule = ShaderModuleCreateInfo(vertFile);
     VkShaderModuleCreateInfo fragModule = ShaderModuleCreateInfo(fragFile);
     VkShaderModule vertexShader;
