@@ -28,7 +28,7 @@ using std::max;
 
 typedef struct Lighting {
     vec3 worldLightPos;
-};
+} Lighting;
 
 static VkViewport viewport = { .x = 0.0f, .y = 0.0f, .minDepth = 0.0f, .maxDepth = 1.0f };
 static VkRect2D scissorRect = { .offset = { 0, 0 } };
@@ -57,8 +57,13 @@ EarthSceneRenderer::EarthSceneRenderer(void* application, uint32_t screenWidth, 
     swapchain->getScreenExtent = [&]() -> Extent2D { return screenSize; };
     BuildSwapchain(*swapchain);
 
+    VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
+    device->RequestSampleCount(samples);
     RenderPass* swapchainRenderPass;
-    BuildRenderPass<ColorDepthRenderPass>(swapchainRenderPass, *swapchain, *device);
+    swapchainRenderPass = new ColorDepthRenderPass(*device);
+    swapchainRenderPass->getFormat = [this]() -> VkFormat { return swapchain->Format(); };
+    swapchainRenderPass->getSampleCount = [samples]() -> VkSampleCountFlagBits { return samples; };
+    swapchainRenderPass->CreateRenderPass();
     renderPasses.push_back(swapchainRenderPass);
 
     int size = swapchain->ImageViews().size();
@@ -154,7 +159,9 @@ EarthSceneRenderer::EarthSceneRenderer(void* application, uint32_t screenWidth, 
     VkImageCreateInfo imageInfo = ImageCreateInfo(depthFormat,
                                                   { extent2D.width, extent2D.height, 1 },
                                                   1,
-                                                  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+                                                  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                                                  VK_IMAGE_TILING_OPTIMAL,VK_IMAGE_LAYOUT_UNDEFINED,
+                                                  samples);
     VK_CHECK_RESULT(vkCreateImage(d, &imageInfo, nullptr, &_depthImage));
 
     VkMemoryRequirements memoryRequirements;
@@ -248,8 +255,6 @@ EarthSceneRenderer::EarthSceneRenderer(void* application, uint32_t screenWidth, 
 
     VkPipelineMultisampleStateCreateInfo multisample = {};
     multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
-    device->RequestSampleCount(samples);
     multisample.rasterizationSamples = samples;
     multisample.sampleShadingEnable = (samples == VK_SAMPLE_COUNT_1_BIT) ? VK_FALSE : VK_TRUE;
 
@@ -275,7 +280,7 @@ EarthSceneRenderer::EarthSceneRenderer(void* application, uint32_t screenWidth, 
                                                                                &colorBlend,
                                                                                _pipelineLayout,
                                                                                (*renderPasses[0]).GetRenderPass(),
-                                                                               parameters);
+                                                                               &parameters);
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(d, VK_NULL_HANDLE, 1, &graphicsPipeline, nullptr, &_pipeline));
 
     vkDestroyShaderModule(d, vertexShader, nullptr);

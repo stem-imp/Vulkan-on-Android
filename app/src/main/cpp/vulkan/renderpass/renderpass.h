@@ -18,6 +18,7 @@ namespace Vulkan
         void CreateRenderPass();
         // Get format of VkSurfaceFormat.
         function<VkFormat(void)> getFormat;
+        function<VkSampleCountFlagBits(void)> getSampleCount;
 
         VkRenderPass GetRenderPass() const { return _renderPass; }
     protected:

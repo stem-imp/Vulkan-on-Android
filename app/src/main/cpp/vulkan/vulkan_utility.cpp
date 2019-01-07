@@ -823,28 +823,28 @@ VkGraphicsPipelineCreateInfo GraphicsPipelineCreateInfo(uint32_t                
                                                         const VkPipelineColorBlendStateCreateInfo*    pColorBlendState,
                                                         VkPipelineLayout                              layout,
                                                         VkRenderPass                                  renderPass,
-                                                        GraphicsPipelineInfoParameters                optionalParameters)
+                                                        const GraphicsPipelineInfoParameters*         optionalParameters)
 {
     VkGraphicsPipelineCreateInfo graphicsPipelineInfo = {};
     graphicsPipelineInfo.sType                        = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    graphicsPipelineInfo.pNext                        = optionalParameters.pNext;
-    graphicsPipelineInfo.flags                        = optionalParameters.flags;
+    graphicsPipelineInfo.pNext                        = optionalParameters->pNext;
+    graphicsPipelineInfo.flags                        = optionalParameters->flags;
     graphicsPipelineInfo.stageCount                   = stageCount;
     graphicsPipelineInfo.pStages                      = pStages;
     graphicsPipelineInfo.pVertexInputState            = pVertexInputState;
     graphicsPipelineInfo.pInputAssemblyState          = pInputAssemblyState;
-    graphicsPipelineInfo.pTessellationState           = optionalParameters.pTessellationState;
+    graphicsPipelineInfo.pTessellationState           = optionalParameters->pTessellationState;
     graphicsPipelineInfo.pViewportState               = pViewportState;
     graphicsPipelineInfo.pRasterizationState          = pRasterizationState;
-    graphicsPipelineInfo.pMultisampleState            = optionalParameters.pMultisampleState;
-    graphicsPipelineInfo.pDepthStencilState           = optionalParameters.pDepthStencilState;
+    graphicsPipelineInfo.pMultisampleState            = optionalParameters->pMultisampleState;
+    graphicsPipelineInfo.pDepthStencilState           = optionalParameters->pDepthStencilState;
     graphicsPipelineInfo.pColorBlendState             = pColorBlendState;
-    graphicsPipelineInfo.pDynamicState                = optionalParameters.pDynamicState;
+    graphicsPipelineInfo.pDynamicState                = optionalParameters->pDynamicState;
     graphicsPipelineInfo.layout                       = layout;
     graphicsPipelineInfo.renderPass                   = renderPass;
-    graphicsPipelineInfo.subpass                      = optionalParameters.subpass;
-    graphicsPipelineInfo.basePipelineHandle           = optionalParameters.basePipelineHandle;
-    graphicsPipelineInfo.basePipelineIndex            = optionalParameters.basePipelineIndex;
+    graphicsPipelineInfo.subpass                      = optionalParameters->subpass;
+    graphicsPipelineInfo.basePipelineHandle           = optionalParameters->basePipelineHandle;
+    graphicsPipelineInfo.basePipelineIndex            = optionalParameters->basePipelineIndex;
     return graphicsPipelineInfo;
 }
 

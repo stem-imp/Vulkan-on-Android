@@ -371,7 +371,7 @@ VkGraphicsPipelineCreateInfo GraphicsPipelineCreateInfo(uint32_t                
                                                         const VkPipelineColorBlendStateCreateInfo*    pColorBlendState,
                                                         VkPipelineLayout                              layout,
                                                         VkRenderPass                                  renderPass,
-                                                        GraphicsPipelineInfoParameters                optionalParameters = GraphicsPipelineInfoParameters());
+                                                        const GraphicsPipelineInfoParameters*         optionalParameters);
 
 //
 //VkPipeline BuildDefaultGraphicsPipeline()

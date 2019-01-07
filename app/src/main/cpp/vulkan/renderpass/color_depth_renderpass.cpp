@@ -16,7 +16,7 @@ void ColorDepthRenderPass::CreateRenderPassImpl()
     const Device& device = _device;
     VkAttachmentDescription colorAttachment = {};
     colorAttachment.format = getFormat();
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachment.samples = getSampleCount();
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -52,7 +52,6 @@ void ColorDepthRenderPass::CreateRenderPassImpl()
     subpassDescription.colorAttachmentCount = 1;
     subpassDescription.pColorAttachments = &colorReference;
     subpassDescription.pDepthStencilAttachment = &depthReference;
-    subpassDescription.pDepthStencilAttachment = nullptr;
 
     VkAttachmentDescription attachments[] = { colorAttachment, depthAttachment };
     VkRenderPassCreateInfo renderPassInfo = {};
