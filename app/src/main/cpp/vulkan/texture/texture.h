@@ -25,6 +25,7 @@ namespace Vulkan
             uint32_t            channelsPerPixel;
             uint32_t            mipmapLevels = 1;
             VkSamplerMipmapMode samplerMipmapMode;
+            bool                sRGB;
             VkFormat            format;
         } TextureAttribs;
 

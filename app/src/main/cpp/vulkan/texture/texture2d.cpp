@@ -59,9 +59,17 @@ namespace Vulkan
     {
         vector<VkFormat> formats;
         if (textureAttribs.channelsPerPixel == 3) {
-            formats.push_back(VK_FORMAT_R8G8B8_UNORM);
+            if (textureAttribs.sRGB) {
+                formats.push_back(VK_FORMAT_R8G8B8_SRGB);
+            } else {
+                formats.push_back(VK_FORMAT_R8G8B8_UNORM);
+            }
         } else if (textureAttribs.channelsPerPixel == 4) {
-            formats.push_back(VK_FORMAT_R8G8B8A8_UNORM);
+            if (textureAttribs.sRGB) {
+                formats.push_back(VK_FORMAT_R8G8B8A8_SRGB);
+            } else {
+                formats.push_back(VK_FORMAT_R8G8B8A8_UNORM);
+            }
         }
         textureAttribs.format = FindDeviceSupportedFormat(formats,
                                                           VK_IMAGE_TILING_OPTIMAL,

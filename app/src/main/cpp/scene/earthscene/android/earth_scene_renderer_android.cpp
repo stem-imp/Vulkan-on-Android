@@ -26,6 +26,10 @@ using std::unordered_map;
 using std::min;
 using std::max;
 
+typedef struct Lighting {
+    vec3 worldLightPos;
+};
+
 static VkViewport viewport = { .x = 0.0f, .y = 0.0f, .minDepth = 0.0f, .maxDepth = 1.0f };
 static VkRect2D scissorRect = { .offset = { 0, 0 } };
 static unordered_map<int, int> currentFrameToImageindex;
@@ -99,6 +103,7 @@ EarthSceneRenderer::EarthSceneRenderer(void* application, uint32_t screenWidth, 
                                                    (int*)&textureAttribs.height,
                                                    (int*)&textureAttribs.channelsPerPixel,
                                                    STBI_rgb_alpha);
+                    textureAttribs.sRGB = true;
                     textureAttribs.mipmapLevels = (uint32_t)(floor(log2(max(textureAttribs.width, textureAttribs.height)))) + 1;
                     _modelTextures.emplace_back(*device);
                     _modelTextures[_modelTextures.size() - 1].BuildTexture2D(textureAttribs, imageData, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, *command);
@@ -110,12 +115,21 @@ EarthSceneRenderer::EarthSceneRenderer(void* application, uint32_t screenWidth, 
     }
 
 
-    // Prepare MVP buffer.
+    // Prepare MVP & lighting buffer.
     VkDeviceSize mvpSize = sizeof(Vulkan::MVP);
     _buffers.emplace_back(*device);
     Buffer& mvpBuffer = _buffers[0];
     mvpBuffer.BuildDefaultBuffer(mvpSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     mvpBuffer.Map();
+
+    _buffers.emplace_back(*device);
+    Buffer& lightPosBuffer = _buffers[1];
+    lightPosBuffer.BuildDefaultBuffer(sizeof(Lighting), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    lightPosBuffer.Map();
+    Lighting lighting;
+    lighting.worldLightPos = vec3(12.0f, 12.0f, 12.0f);
+    std::copy((uint8_t*)&lighting, (uint8_t*)&lighting + sizeof(Lighting), (uint8_t*)lightPosBuffer.mapped);
+    lightPosBuffer.Unmap();
 
 
     // Prepare sampler.
@@ -123,9 +137,9 @@ EarthSceneRenderer::EarthSceneRenderer(void* application, uint32_t screenWidth, 
     device->RequsetSamplerAnisotropy(samplerAnisotropy);
     VkSamplerCreateInfo samplerInfo = SamplerCreateInfo(textureAttribs.samplerMipmapMode,
                                                         textureAttribs.mipmapLevels,
-                                                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
-                                                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
-                                                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+                                                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                                                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                                                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
                                                         samplerAnisotropy);
     vkCreateSampler(d, &samplerInfo, nullptr, &_diffuseSampler);
 
@@ -336,10 +350,17 @@ void EarthSceneRenderer::BuildDescriptorSetLayout()
     samplerBinding1.stageFlags                   = VK_SHADER_STAGE_FRAGMENT_BIT;
     samplerBinding1.pImmutableSamplers           = nullptr;
 
-    VkDescriptorSetLayoutBinding binding[] = { uboBinding, samplerBinding, samplerBinding1 };
+    VkDescriptorSetLayoutBinding uboBinding1 = {};
+    uboBinding1.binding            = 3;
+    uboBinding1.descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboBinding1.descriptorCount    = 1;
+    uboBinding1.stageFlags         = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    uboBinding1.pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutBinding binding[] = { uboBinding, samplerBinding, samplerBinding1, uboBinding1 };
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 3;
+    layoutInfo.bindingCount = 4;
     layoutInfo.pBindings = binding;
     VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device->LogicalDevice(), &layoutInfo, nullptr, &_descriptorSetLayout));
 
@@ -352,7 +373,7 @@ void EarthSceneRenderer::BuildDescriptorPool()
 {
     VkDescriptorPoolSize poolSizes[] = { {}, {} };
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = 1;
+    poolSizes[0].descriptorCount = 2;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     poolSizes[1].descriptorCount = 2;
     VkDescriptorPoolCreateInfo descriptorPool = {};
@@ -373,7 +394,7 @@ void EarthSceneRenderer::BuildDescriptorSet()
     VK_CHECK_RESULT(vkAllocateDescriptorSets(device->LogicalDevice(), &descriptorSet, &_descriptorSet));
 
     VkDescriptorBufferInfo bufferInfo = {};
-    bufferInfo.buffer = _buffers[0].GetBuffer();
+    bufferInfo.buffer = _buffers[0].GetBuffer(); // MVP
     bufferInfo.offset = 0;
     bufferInfo.range = VK_WHOLE_SIZE;
 
@@ -392,7 +413,12 @@ void EarthSceneRenderer::BuildDescriptorSet()
     imageInfo1.imageView = _modelTextures[0].ImageView(); // normal texture
     imageInfo1.sampler = _diffuseSampler;
 
-    VkWriteDescriptorSet descriptorWrites[] = { {}, {}, {} };
+    VkDescriptorBufferInfo bufferInfo1 = {};
+    bufferInfo1.buffer = _buffers[1].GetBuffer(); // lighting
+    bufferInfo1.offset = 0;
+    bufferInfo1.range = VK_WHOLE_SIZE;
+
+    VkWriteDescriptorSet descriptorWrites[] = { {}, {}, {}, {} };
     descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrites[0].dstSet = _descriptorSet;
     descriptorWrites[0].dstBinding = 0;
@@ -425,7 +451,15 @@ void EarthSceneRenderer::BuildDescriptorSet()
     descriptorWrites[2].descriptorCount = 1;
     descriptorWrites[2].pImageInfo = &imageInfo1;
 
-    vkUpdateDescriptorSets(device->LogicalDevice(), 3, descriptorWrites, 0, nullptr);
+    descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[3].dstSet = _descriptorSet;
+    descriptorWrites[3].dstBinding = 3;
+    descriptorWrites[3].dstArrayElement = 0;
+    descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[3].descriptorCount = 1;
+    descriptorWrites[3].pBufferInfo = &bufferInfo1;
+
+    vkUpdateDescriptorSets(device->LogicalDevice(), 4, descriptorWrites, 0, nullptr);
 }
 
 void EarthSceneRenderer::BuildCommandBuffer(int index)
@@ -440,7 +474,7 @@ void EarthSceneRenderer::BuildCommandBuffer(int index)
     renderPassBeginInfo.renderArea.extent = swapchain->Extent();
     renderPassBeginInfo.clearValueCount   = 2;
 
-    vector<VkClearValue> clearValues = { { 0.0f, 0.75f, 0.25f, 0.0f }, { 1.0f, 0 } };
+    vector<VkClearValue> clearValues = { { 0.03125f, 0.0625f, 0.15625f, 0.0f }, { 1.0f, 0 } };
     renderPassBeginInfo.pClearValues = clearValues.data();
     vkCmdBeginRenderPass(_commandBuffers.buffers[index], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
