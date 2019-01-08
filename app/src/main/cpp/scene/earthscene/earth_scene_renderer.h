@@ -27,10 +27,15 @@ public:
     vector<Model> models;
 private:
     // ==== Vulkan ==== //
+    void BuildDepthImage(RenderPass* swapchainRenderPass, VkSampleCountFlagBits sampleCount);
     void BuildDescriptorSetLayout();
     void BuildDescriptorPool();
     void BuildDescriptorSet();
+    void BuildGraphicsPipeline(void* application, VkSampleCountFlagBits sampleCount);
     void BuildCommandBuffer(int index);
+    void RebuildSwapchain();
+
+    void* _application;
 
     vector<ModelResource> _modelResources;
     vector<Texture2D>     _modelTextures;

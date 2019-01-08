@@ -91,6 +91,7 @@ EarthSceneRenderer::EarthSceneRenderer(void* application, uint32_t screenWidth, 
 
 
     // Load models.
+    _application = application;
     android_app* app = (android_app*)application;
     models.emplace_back(Model());
     Model& model = models[0];
@@ -132,7 +133,7 @@ EarthSceneRenderer::EarthSceneRenderer(void* application, uint32_t screenWidth, 
     lightPosBuffer.BuildDefaultBuffer(sizeof(Lighting), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     lightPosBuffer.Map();
     Lighting lighting;
-    lighting.worldLightPos = vec3(12.0f, 12.0f, 12.0f);
+    lighting.worldLightPos = vec3(12.0f, 4.0f, 12.0f);
     std::copy((uint8_t*)&lighting, (uint8_t*)&lighting + sizeof(Lighting), (uint8_t*)lightPosBuffer.mapped);
     lightPosBuffer.Unmap();
 
@@ -148,143 +149,14 @@ EarthSceneRenderer::EarthSceneRenderer(void* application, uint32_t screenWidth, 
                                                         samplerAnisotropy);
     vkCreateSampler(d, &samplerInfo, nullptr, &_diffuseSampler);
 
-
-    // Prepare depth image.
-    VkFormat depthFormat = ((ColorDepthRenderPass*)swapchainRenderPass)->DepthFormat();
-    VkImageAspectFlags depthImageAspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
-    if (depthFormat == VK_FORMAT_D16_UNORM_S8_UINT || depthFormat == VK_FORMAT_D24_UNORM_S8_UINT || depthFormat == VK_FORMAT_D32_SFLOAT_S8_UINT) {
-        depthImageAspectFlags |= VK_IMAGE_ASPECT_STENCIL_BIT;
-    }
-    VkExtent2D extent2D = swapchain->Extent();
-    VkImageCreateInfo imageInfo = ImageCreateInfo(depthFormat,
-                                                  { extent2D.width, extent2D.height, 1 },
-                                                  1,
-                                                  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                                                  VK_IMAGE_TILING_OPTIMAL,VK_IMAGE_LAYOUT_UNDEFINED,
-                                                  samples);
-    VK_CHECK_RESULT(vkCreateImage(d, &imageInfo, nullptr, &_depthImage));
-
-    VkMemoryRequirements memoryRequirements;
-    uint32_t memoryTypeIndex;
-    VkMemoryAllocateInfo memoryAllocateInfo = MemoryAllocateInfo(_depthImage,
-                                                                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                                                                 *device, memoryRequirements,
-                                                                 memoryTypeIndex);
-    VK_CHECK_RESULT(vkAllocateMemory(d, &memoryAllocateInfo, nullptr, &_depthImageMemory));
-    VK_CHECK_RESULT(vkBindImageMemory(d, _depthImage, _depthImageMemory, 0));
-
-    VkImageViewCreateInfo imageViewInfo = ImageViewCreateInfo(_depthImage, depthFormat, { depthImageAspectFlags, 0, 1, 0, 1 });
-    VK_CHECK_RESULT(vkCreateImageView(d, &imageViewInfo, nullptr, &_depthView));
-
-    vector<VkCommandBuffer> cmds = Command::CreateAndBeginCommandBuffers(command->ShortLivedGraphcisPool(),
-                                                                         VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-                                                                         1,
-                                                                         VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-                                                                         d);
-    PipelineBarrierParameters pipelineBarrierParameters = {};
-    pipelineBarrierParameters.commandBuffer = cmds[0];
-    pipelineBarrierParameters.imageMemoryBarrierCount = 1;
-    VkImageMemoryBarrier barrier = ImageMemoryBarrier(0,
-                                                      VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
-                                                      VK_IMAGE_LAYOUT_UNDEFINED,
-                                                      VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                                                      _depthImage,
-                                                      { depthImageAspectFlags, 0, 1, 0, 1 });
-    pipelineBarrierParameters.pImageMemoryBarriers = &barrier;
-    TransitionImageLayout(&pipelineBarrierParameters);
-    Command::EndAndSubmitCommandBuffer(pipelineBarrierParameters.commandBuffer, device->FamilyQueues().graphics.queue, command->ShortLivedGraphcisPool(), d);
-
+    BuildDepthImage(swapchainRenderPass, samples);
 
     // Prepare descriptor related stuff.
     BuildDescriptorSetLayout();
     BuildDescriptorPool();
     BuildDescriptorSet();
 
-
-    // Prepare graphics pipeline.
-    vector<char*> vertFile, fragFile;
-    AndroidNative::Open<char*>("shaders/phong_shading.vert.spv", app, vertFile);
-    AndroidNative::Open<char*>("shaders/phong_shading.frag.spv", app, fragFile);
-    VkShaderModuleCreateInfo vertModule = ShaderModuleCreateInfo(vertFile);
-    VkShaderModuleCreateInfo fragModule = ShaderModuleCreateInfo(fragFile);
-    VkShaderModule vertexShader;
-    VK_CHECK_RESULT(vkCreateShaderModule(d, &vertModule, nullptr, &vertexShader));
-    VkShaderModule fragmentShader;
-    VK_CHECK_RESULT(vkCreateShaderModule(d, &fragModule, nullptr, &fragmentShader));
-
-    VkPipelineShaderStageCreateInfo shaderStages[] = {
-        PipelineShaderStageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT, vertexShader),
-        PipelineShaderStageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader)
-    };
-
-    const VertexLayout& vertexLayout = model.VertexLayouts()[0];
-    VkVertexInputBindingDescription vertexInputBinding = {};
-    vertexInputBinding.binding                         = 0;
-    vertexInputBinding.stride                          = vertexLayout.Stride();
-    vertexInputBinding.inputRate                       = VK_VERTEX_INPUT_RATE_VERTEX;
-    vector<VkVertexInputAttributeDescription> vertexAttributes;
-    VkFormat format;
-    for (uint32_t i = 0; i < vertexLayout.components.size(); i++) {
-        vertexAttributes.emplace_back();
-        vertexAttributes[i].location = i;
-        vertexAttributes[i].binding  = 0;
-        if (vertexLayout.components[i] != VertexComponent::VERTEX_COMPONENT_UV) {
-            format = VK_FORMAT_R32G32B32_SFLOAT;
-        } else {
-            format = VK_FORMAT_R32G32_SFLOAT;
-        }
-        vertexAttributes[i].format = format;
-        vertexAttributes[i].offset = vertexLayout.offsets[i];
-    }
-    VkPipelineVertexInputStateCreateInfo pipelineVertexInput = PipelineVertexInputStateCreateInfo(1, &vertexInputBinding, vertexAttributes.size(), vertexAttributes.data());
-
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
-    inputAssembly.sType                                  = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology                               = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    inputAssembly.primitiveRestartEnable                 = VK_FALSE;
-
-    // pTessellationState  ignored.
-
-    VkViewport viewport = Viewport(extent2D.width, extent2D.height);
-    VkRect2D scissor = {};
-    scissor.offset = {0, 0};
-    scissor.extent = extent2D;
-    VkPipelineViewportStateCreateInfo viewportState = PipelineViewport(&viewport, &scissor);
-
-    VkPipelineRasterizationStateCreateInfo rasterization = Rasterization(VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
-
-    VkPipelineMultisampleStateCreateInfo multisample = {};
-    multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisample.rasterizationSamples = samples;
-    multisample.sampleShadingEnable = (samples == VK_SAMPLE_COUNT_1_BIT) ? VK_FALSE : VK_TRUE;
-
-    VkPipelineDepthStencilStateCreateInfo depthStencil = DepthStencil();
-
-    VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
-    colorBlendAttachment.colorWriteMask                      = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachment.blendEnable                         = VK_FALSE;
-    float blendConstants[] = { VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ZERO };
-    VkPipelineColorBlendStateCreateInfo colorBlend = ColorBlend(VK_FALSE, VK_LOGIC_OP_NO_OP, 1, &colorBlendAttachment, blendConstants);
-
-    // pDynamicState ignored.
-
-    GraphicsPipelineInfoParameters parameters = GraphicsPipelineInfoParameters();
-    parameters.pMultisampleState  = &multisample;
-    parameters.pDepthStencilState = &depthStencil;
-    VkGraphicsPipelineCreateInfo graphicsPipeline = GraphicsPipelineCreateInfo(2,
-                                                                               shaderStages,
-                                                                               &pipelineVertexInput,
-                                                                               &inputAssembly,
-                                                                               &viewportState,
-                                                                               &rasterization,
-                                                                               &colorBlend,
-                                                                               _pipelineLayout,
-                                                                               (*renderPasses[0]).GetRenderPass(),
-                                                                               &parameters);
-    VK_CHECK_RESULT(vkCreateGraphicsPipelines(d, VK_NULL_HANDLE, 1, &graphicsPipeline, nullptr, &_pipeline));
-
-    vkDestroyShaderModule(d, vertexShader, nullptr);
-    vkDestroyShaderModule(d, fragmentShader, nullptr);
+    BuildGraphicsPipeline(application, samples);
 }
 
 EarthSceneRenderer::~EarthSceneRenderer()
@@ -330,6 +202,54 @@ EarthSceneRenderer::~EarthSceneRenderer()
     delete surface          , surface           = nullptr;
     delete layerAndExtension, layerAndExtension = nullptr;
     delete instance         , instance          = nullptr;
+}
+
+void EarthSceneRenderer::BuildDepthImage(RenderPass* swapchainRenderPass, VkSampleCountFlagBits sampleCount)
+{
+    VkFormat depthFormat = ((ColorDepthRenderPass*)swapchainRenderPass)->DepthFormat();
+    VkImageAspectFlags depthImageAspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
+    if (depthFormat == VK_FORMAT_D16_UNORM_S8_UINT || depthFormat == VK_FORMAT_D24_UNORM_S8_UINT || depthFormat == VK_FORMAT_D32_SFLOAT_S8_UINT) {
+        depthImageAspectFlags |= VK_IMAGE_ASPECT_STENCIL_BIT;
+    }
+    VkExtent2D extent2D = swapchain->Extent();
+    VkImageCreateInfo imageInfo = ImageCreateInfo(depthFormat,
+                                                  { extent2D.width, extent2D.height, 1 },
+                                                  1,
+                                                  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                                                  VK_IMAGE_TILING_OPTIMAL,VK_IMAGE_LAYOUT_UNDEFINED,
+                                                  sampleCount);
+    VkDevice d = device->LogicalDevice();
+    VK_CHECK_RESULT(vkCreateImage(d, &imageInfo, nullptr, &_depthImage));
+
+    VkMemoryRequirements memoryRequirements;
+    uint32_t memoryTypeIndex;
+    VkMemoryAllocateInfo memoryAllocateInfo = MemoryAllocateInfo(_depthImage,
+                                                                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                                                                 *device, memoryRequirements,
+                                                                 memoryTypeIndex);
+    VK_CHECK_RESULT(vkAllocateMemory(d, &memoryAllocateInfo, nullptr, &_depthImageMemory));
+    VK_CHECK_RESULT(vkBindImageMemory(d, _depthImage, _depthImageMemory, 0));
+
+    VkImageViewCreateInfo imageViewInfo = ImageViewCreateInfo(_depthImage, depthFormat, { depthImageAspectFlags, 0, 1, 0, 1 });
+    VK_CHECK_RESULT(vkCreateImageView(d, &imageViewInfo, nullptr, &_depthView));
+
+    vector<VkCommandBuffer> cmds = Command::CreateAndBeginCommandBuffers(command->ShortLivedGraphcisPool(),
+                                                                         VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+                                                                         1,
+                                                                         VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+                                                                         d);
+    PipelineBarrierParameters pipelineBarrierParameters = {};
+    pipelineBarrierParameters.commandBuffer = cmds[0];
+    pipelineBarrierParameters.imageMemoryBarrierCount = 1;
+    VkImageMemoryBarrier barrier = ImageMemoryBarrier(0,
+                                                      VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+                                                      VK_IMAGE_LAYOUT_UNDEFINED,
+                                                      VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                                                      _depthImage,
+                                                      { depthImageAspectFlags, 0, 1, 0, 1 });
+    pipelineBarrierParameters.pImageMemoryBarriers = &barrier;
+    TransitionImageLayout(&pipelineBarrierParameters);
+    Command::EndAndSubmitCommandBuffer(pipelineBarrierParameters.commandBuffer, device->FamilyQueues().graphics.queue, command->ShortLivedGraphcisPool(), d);
 }
 
 void EarthSceneRenderer::BuildDescriptorSetLayout()
@@ -467,6 +387,97 @@ void EarthSceneRenderer::BuildDescriptorSet()
     vkUpdateDescriptorSets(device->LogicalDevice(), 4, descriptorWrites, 0, nullptr);
 }
 
+void EarthSceneRenderer::BuildGraphicsPipeline(void* application, VkSampleCountFlagBits sampleCount)
+{
+    android_app* app = (android_app*)application;
+    vector<char*> vertFile, fragFile;
+    AndroidNative::Open<char*>("shaders/phong_shading.vert.spv", app, vertFile);
+    AndroidNative::Open<char*>("shaders/phong_shading.frag.spv", app, fragFile);
+    VkShaderModuleCreateInfo vertModule = ShaderModuleCreateInfo(vertFile);
+    VkShaderModuleCreateInfo fragModule = ShaderModuleCreateInfo(fragFile);
+    VkShaderModule vertexShader;
+    VkDevice d = device->LogicalDevice();
+    VK_CHECK_RESULT(vkCreateShaderModule(d, &vertModule, nullptr, &vertexShader));
+    VkShaderModule fragmentShader;
+    VK_CHECK_RESULT(vkCreateShaderModule(d, &fragModule, nullptr, &fragmentShader));
+
+    VkPipelineShaderStageCreateInfo shaderStages[] = {
+            PipelineShaderStageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT, vertexShader),
+            PipelineShaderStageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader)
+    };
+
+    Model& model = models[0];
+    const VertexLayout& vertexLayout = model.VertexLayouts()[0];
+    VkVertexInputBindingDescription vertexInputBinding = {};
+    vertexInputBinding.binding                         = 0;
+    vertexInputBinding.stride                          = vertexLayout.Stride();
+    vertexInputBinding.inputRate                       = VK_VERTEX_INPUT_RATE_VERTEX;
+    vector<VkVertexInputAttributeDescription> vertexAttributes;
+    VkFormat format;
+    for (uint32_t i = 0; i < vertexLayout.components.size(); i++) {
+        vertexAttributes.emplace_back();
+        vertexAttributes[i].location = i;
+        vertexAttributes[i].binding  = 0;
+        if (vertexLayout.components[i] != VertexComponent::VERTEX_COMPONENT_UV) {
+            format = VK_FORMAT_R32G32B32_SFLOAT;
+        } else {
+            format = VK_FORMAT_R32G32_SFLOAT;
+        }
+        vertexAttributes[i].format = format;
+        vertexAttributes[i].offset = vertexLayout.offsets[i];
+    }
+    VkPipelineVertexInputStateCreateInfo pipelineVertexInput = PipelineVertexInputStateCreateInfo(1, &vertexInputBinding, vertexAttributes.size(), vertexAttributes.data());
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+    inputAssembly.sType                                  = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology                               = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.primitiveRestartEnable                 = VK_FALSE;
+
+    // pTessellationState  ignored.
+
+    VkExtent2D extent2D = swapchain->Extent();
+    VkViewport viewport = Viewport(extent2D.width, extent2D.height);
+    VkRect2D scissor = {};
+    scissor.offset = {0, 0};
+    scissor.extent = extent2D;
+    VkPipelineViewportStateCreateInfo viewportState = PipelineViewport(&viewport, &scissor);
+
+    VkPipelineRasterizationStateCreateInfo rasterization = Rasterization(VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+
+    VkPipelineMultisampleStateCreateInfo multisample = {};
+    multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisample.rasterizationSamples = sampleCount;
+    multisample.sampleShadingEnable = (sampleCount == VK_SAMPLE_COUNT_1_BIT) ? VK_FALSE : VK_TRUE;
+
+    VkPipelineDepthStencilStateCreateInfo depthStencil = DepthStencil();
+
+    VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+    colorBlendAttachment.colorWriteMask                      = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.blendEnable                         = VK_FALSE;
+    float blendConstants[] = { VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ZERO };
+    VkPipelineColorBlendStateCreateInfo colorBlend = ColorBlend(VK_FALSE, VK_LOGIC_OP_NO_OP, 1, &colorBlendAttachment, blendConstants);
+
+    // pDynamicState ignored.
+
+    GraphicsPipelineInfoParameters parameters = GraphicsPipelineInfoParameters();
+    parameters.pMultisampleState  = &multisample;
+    parameters.pDepthStencilState = &depthStencil;
+    VkGraphicsPipelineCreateInfo graphicsPipeline = GraphicsPipelineCreateInfo(2,
+                                                                               shaderStages,
+                                                                               &pipelineVertexInput,
+                                                                               &inputAssembly,
+                                                                               &viewportState,
+                                                                               &rasterization,
+                                                                               &colorBlend,
+                                                                               _pipelineLayout,
+                                                                               (*renderPasses[0]).GetRenderPass(),
+                                                                               &parameters);
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(d, VK_NULL_HANDLE, 1, &graphicsPipeline, nullptr, &_pipeline));
+
+    vkDestroyShaderModule(d, vertexShader, nullptr);
+    vkDestroyShaderModule(d, fragmentShader, nullptr);
+}
+
 void EarthSceneRenderer::BuildCommandBuffer(int index)
 {
     RenderPass* swapchainRenderPass = renderPasses[0];
@@ -510,7 +521,7 @@ void EarthSceneRenderer::RenderImpl()
     if (orientationChanged) {
         DebugLog("Orientation changed.");
         orientationChanged = false;
-        //RebuildSwapchain();
+        RebuildSwapchain();
         return;
     }
 
@@ -558,11 +569,60 @@ void EarthSceneRenderer::RenderImpl()
     currentFrameIndex = (currentFrameIndex + 1) % swapchain->ConcurrentFramesCount();
 }
 
+void EarthSceneRenderer::RebuildSwapchain()
+{
+    DebugLog("~EarthSceneRenderer()");
+
+    VkDevice d = device->LogicalDevice();
+
+    vkDeviceWaitIdle(d);
+
+    // Delete out-dated data.
+    vkDestroyImageView(d, _depthView, nullptr), _depthView = VK_NULL_HANDLE;
+    vkDestroyImage(d, _depthImage, nullptr), _depthImage = VK_NULL_HANDLE;
+    vkFreeMemory(d, _depthImageMemory, nullptr), _depthImageMemory = VK_NULL_HANDLE;
+
+    vkDestroyPipeline(d, _pipeline, nullptr), _pipeline = VK_NULL_HANDLE;
+
+    framebuffers.clear();
+
+    for (auto& r : renderPasses) {
+        delete r, r = nullptr;
+    }
+    renderPasses.clear();
+
+    delete swapchain, swapchain         = nullptr;
+
+
+    // Create new data.
+    swapchain = new Swapchain(*surface, *device);
+    swapchain->getScreenExtent = [&]() -> Extent2D { return screenSize; };
+    BuildSwapchain(*swapchain);
+
+    VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
+    device->RequestSampleCount(samples);
+    RenderPass* swapchainRenderPass;
+    swapchainRenderPass = new ColorDepthRenderPass(*device);
+    swapchainRenderPass->getFormat = [this]() -> VkFormat { return swapchain->Format(); };
+    swapchainRenderPass->getSampleCount = [samples]() -> VkSampleCountFlagBits { return samples; };
+    swapchainRenderPass->CreateRenderPass();
+    renderPasses.push_back(swapchainRenderPass);
+
+    int size = swapchain->ImageViews().size();
+    for (int i = 0 ; i < size; i++) {
+        framebuffers.push_back(*device);
+    }
+
+    BuildDepthImage(swapchainRenderPass, samples);
+
+    BuildGraphicsPipeline(_application, samples);
+}
+
 void EarthSceneRenderer::UpdateMVP(float elapsedTime)
 {
     MVP mvp;
     mvp.model = glm::rotate(mat4(1.0f), glm::radians(elapsedTime * 16.0f), vec3(0.0f, 1.0f, 0.0f));
-    mvp.view = glm::lookAt(vec3(0.0f, 0.0f, 24.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    mvp.view = glm::lookAt(vec3(0.0f, 2.0f, 12.0f), vec3(0.0f, 2.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
     mvp.projection = glm::perspective(glm::radians(90.0f), swapchain->Extent().width / (float)swapchain->Extent().height, 0.125f, 96.0f);
     mvp.projection[1][1] *= -1;
     std::copy((uint8_t*)&mvp, (uint8_t*)&mvp + sizeof(MVP), (uint8_t*)_buffers[0].mapped);
