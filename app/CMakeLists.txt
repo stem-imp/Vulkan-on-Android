@@ -99,7 +99,6 @@ add_library( # Sets the name of the library.
         src/main/cpp/vulkan/vulkan_utility.cpp
         src/main/cpp/vulkan/android/renderer_vulkan_android.cpp
 
-        src/main/cpp/vulkan_main.cpp
         src/main/cpp/scene/emptyscene/android/empty_scene_renderer_vulkan_android.cpp
         src/main/cpp/scene/emptyscene/android/empty_scene_android.cpp
         src/main/cpp/scene/earthscene/android/earth_scene_renderer_android.cpp
