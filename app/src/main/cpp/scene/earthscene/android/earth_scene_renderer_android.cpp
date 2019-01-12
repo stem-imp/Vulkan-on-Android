@@ -139,7 +139,7 @@ EarthSceneRenderer::EarthSceneRenderer(void* application, uint32_t screenWidth, 
 
 
     // Prepare sampler.
-    float samplerAnisotropy = device->FeaturesEnabled().samplerAnisotropy ? 8 : 0;
+    float samplerAnisotropy = device->FeaturesEnabled().samplerAnisotropy ? 8 : 1;
     device->RequsetSamplerAnisotropy(samplerAnisotropy);
     VkSamplerCreateInfo samplerInfo = SamplerCreateInfo(textureAttribs.samplerMipmapMode,
                                                         textureAttribs.mipmapLevels,
