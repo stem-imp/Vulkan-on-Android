@@ -232,24 +232,6 @@ void EarthSceneRenderer::BuildDepthImage(RenderPass* swapchainRenderPass, VkSamp
 
     VkImageViewCreateInfo imageViewInfo = ImageViewCreateInfo(_depthImage, depthFormat, { depthImageAspectFlags, 0, 1, 0, 1 });
     VK_CHECK_RESULT(vkCreateImageView(d, &imageViewInfo, nullptr, &_depthView));
-
-    vector<VkCommandBuffer> cmds = Command::CreateAndBeginCommandBuffers(command->ShortLivedGraphcisPool(),
-                                                                         VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-                                                                         1,
-                                                                         VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-                                                                         d);
-    PipelineBarrierParameters pipelineBarrierParameters = {};
-    pipelineBarrierParameters.commandBuffer = cmds[0];
-    pipelineBarrierParameters.imageMemoryBarrierCount = 1;
-    VkImageMemoryBarrier barrier = ImageMemoryBarrier(0,
-                                                      VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
-                                                      VK_IMAGE_LAYOUT_UNDEFINED,
-                                                      VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                                                      _depthImage,
-                                                      { depthImageAspectFlags, 0, 1, 0, 1 });
-    pipelineBarrierParameters.pImageMemoryBarriers = &barrier;
-    TransitionImageLayout(&pipelineBarrierParameters);
-    Command::EndAndSubmitCommandBuffer(pipelineBarrierParameters.commandBuffer, device->FamilyQueues().graphics.queue, command->ShortLivedGraphcisPool(), d);
 }
 
 void EarthSceneRenderer::BuildDescriptorSetLayout()
