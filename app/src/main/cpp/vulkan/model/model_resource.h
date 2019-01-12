@@ -32,13 +32,6 @@ namespace Vulkan
             uint32_t indexCount;
         };
 
-        typedef struct Dimension
-        {
-            vec3 min = vec3(FLT_MAX);
-            vec3 max = vec3(-FLT_MAX);
-            vec3 size;
-        } Dimension;
-
         ModelResource(const Device& device);
         ModelResource(ModelResource&& other);
         virtual ~ModelResource();
@@ -54,7 +47,6 @@ namespace Vulkan
         Buffer        vertices;
         Buffer        indices;
         uint32_t      indicesCount;
-        Dimension     dimension = {};
     };
 }
 

@@ -260,7 +260,7 @@ void EarthSceneRenderer::BuildDescriptorSetLayout()
     uboBinding1.binding            = 3;
     uboBinding1.descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     uboBinding1.descriptorCount    = 1;
-    uboBinding1.stageFlags         = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    uboBinding1.stageFlags         = VK_SHADER_STAGE_VERTEX_BIT;;
     uboBinding1.pImmutableSamplers = nullptr;
 
     VkDescriptorSetLayoutBinding binding[] = { uboBinding, samplerBinding, samplerBinding1, uboBinding1 };

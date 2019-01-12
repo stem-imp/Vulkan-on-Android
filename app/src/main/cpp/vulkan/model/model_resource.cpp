@@ -17,9 +17,6 @@ namespace Vulkan
     {
         DebugLog("ModelResource(ModelResource&&)");
         subMeshes   = std::move(other.subMeshes);
-        dimension   = other.dimension            , other.dimension.size = vec3(0)
-                                                 , other.dimension.min  = vec3(0)
-                                                 , other.dimension.max  = vec3(0);
     }
 
     ModelResource::~ModelResource()
@@ -41,27 +38,12 @@ namespace Vulkan
         uint32_t indexCount  = 0;
         size_t numMeshes = model.Submeshes().size();
         for (size_t i = 0; i < numMeshes; i++) {
-            size_t packSize = 0;
-            for (const auto& component : vertexLayouts[i].components) {
-                switch (component) {
-                    case VERTEX_COMPONENT_POSITION:
-                    case VERTEX_COMPONENT_NORMAL:
-                    case VERTEX_COMPONENT_COLOR:
-                    case VERTEX_COMPONENT_TANGENT:
-                    case VERTEX_COMPONENT_BITANGENT:
-                        packSize += 3;
-                        break;
-                    case VERTEX_COMPONENT_UV:
-                        packSize += 2;
-                        break;
-                }
-            }
-
             subMeshes[i] = {};
             subMeshes[i].vertexBase = vertexCount;
             subMeshes[i].indexBase = indexCount;
 
             const Model::Mesh& m = model.Submeshes()[i];
+            size_t packSize = vertexLayouts[i].Stride() / sizeof(float);
             size_t vCount = m.vertexBuffer.size() / packSize;
             subMeshes[i].vertexCount = vCount;
             vertexCount += vCount;
