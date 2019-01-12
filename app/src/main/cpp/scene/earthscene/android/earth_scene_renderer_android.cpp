@@ -30,8 +30,6 @@ typedef struct Lighting {
     vec3 worldLightPos;
 } Lighting;
 
-static VkViewport viewport = { .x = 0.0f, .y = 0.0f, .minDepth = 0.0f, .maxDepth = 1.0f };
-static VkRect2D scissorRect = { .offset = { 0, 0 } };
 static unordered_map<int, int> currentFrameToImageindex;
 static unordered_map<int, int> imageIndexToCurrentFrame;
 
@@ -216,7 +214,8 @@ void EarthSceneRenderer::BuildDepthImage(RenderPass* swapchainRenderPass, VkSamp
                                                   { extent2D.width, extent2D.height, 1 },
                                                   1,
                                                   VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                                                  VK_IMAGE_TILING_OPTIMAL,VK_IMAGE_LAYOUT_UNDEFINED,
+                                                  VK_IMAGE_TILING_OPTIMAL,
+                                                  VK_IMAGE_LAYOUT_UNDEFINED,
                                                   sampleCount);
     VkDevice d = device->LogicalDevice();
     VK_CHECK_RESULT(vkCreateImage(d, &imageInfo, nullptr, &_depthImage));
@@ -384,8 +383,8 @@ void EarthSceneRenderer::BuildGraphicsPipeline(void* application, VkSampleCountF
     VK_CHECK_RESULT(vkCreateShaderModule(d, &fragModule, nullptr, &fragmentShader));
 
     VkPipelineShaderStageCreateInfo shaderStages[] = {
-            PipelineShaderStageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT, vertexShader),
-            PipelineShaderStageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader)
+        PipelineShaderStageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT, vertexShader),
+        PipelineShaderStageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader)
     };
 
     Model& model = models[0];

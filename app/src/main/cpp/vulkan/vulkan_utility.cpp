@@ -556,10 +556,10 @@ VkMemoryAllocateInfo MemoryAllocateInfo(VkImage               image,
     vkGetImageMemoryRequirements(device.LogicalDevice(), image, &memoryRequirements);
     memoryTypeIndex = MapMemoryTypeToIndex(device.PhysicalDevice(), memoryRequirements.memoryTypeBits, requestedProperties);
     VkMemoryAllocateInfo memoryAllocateInfo = {};
-    memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    memoryAllocateInfo.pNext = pNext;
-    memoryAllocateInfo.allocationSize = memoryRequirements.size;
-    memoryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
+    memoryAllocateInfo.sType                = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    memoryAllocateInfo.pNext                = pNext;
+    memoryAllocateInfo.allocationSize       = memoryRequirements.size;
+    memoryAllocateInfo.memoryTypeIndex      = memoryTypeIndex;
     return memoryAllocateInfo;
 }
 
@@ -572,13 +572,13 @@ VkImageViewCreateInfo ImageViewCreateInfo(VkImage                 image,
                                           VkImageViewCreateFlags  flags)
 {
     VkImageViewCreateInfo imageViewInfo = {};
-    imageViewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    imageViewInfo.pNext = pNext;
-    imageViewInfo.image = image;
-    imageViewInfo.viewType = viewType;
-    imageViewInfo.format   = format;
-    imageViewInfo.components = components;
-    imageViewInfo.subresourceRange = subresourceRange;
+    imageViewInfo.sType                 = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    imageViewInfo.pNext                 = pNext;
+    imageViewInfo.image                 = image;
+    imageViewInfo.viewType              = viewType;
+    imageViewInfo.format                = format;
+    imageViewInfo.components            = components;
+    imageViewInfo.subresourceRange      = subresourceRange;
     return imageViewInfo;
 }
 
@@ -973,7 +973,7 @@ VkImageView CreateImageView(VkImage                image,
     return imageView;
 }
 
-//void TransitionImageLayout(VkPipelineStageFlags sourceStage,
+//void PipelineBarrier(VkPipelineStageFlags sourceStage,
 //                           VkPipelineStageFlags destinationStage,
 //                           VkAccessFlags        srcAccessMask,
 //                           VkAccessFlags        dstAccessMask,
