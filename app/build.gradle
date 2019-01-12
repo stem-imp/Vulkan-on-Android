@@ -21,6 +21,9 @@ android {
                 abiFilters "armeabi-v7a", "arm64-v8a"
             }
         }
+        shaders {
+            glslcArgs.addAll(['--target-env=vulkan1.0', '-c', '-g'])
+        }
     }
     buildTypes {
         release {
