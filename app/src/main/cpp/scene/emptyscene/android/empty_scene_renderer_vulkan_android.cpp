@@ -79,7 +79,7 @@ EmptySceneRenderer::EmptySceneRenderer(void* app, uint32_t screenWidth, uint32_t
 //    {
 //        VkCommandPool pool = command->ShortLivedTransferPool();
 //        VkCommandBuffer buffer = Command::CreateAndBeginCommandBuffers(pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1, 0, d);
-//        TransitionImageLayout(sourceStage, destinationStage, srcAccessMask, dstAccessMask, oldLayout, newLayout, image, aspectMask, buffer);
+//        PipelineBarrier(sourceStage, destinationStage, srcAccessMask, dstAccessMask, oldLayout, newLayout, image, aspectMask, buffer);
 //        Command::EndAndSubmitCommandBuffer(buffer, device->FamilyQueues().transfer.queue, pool, d);
 //    };
 }

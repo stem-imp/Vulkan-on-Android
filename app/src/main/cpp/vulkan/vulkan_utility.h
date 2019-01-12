@@ -221,7 +221,7 @@ typedef struct PipelineBarrierParameters {
     uint32_t                     imageMemoryBarrierCount;
     const VkImageMemoryBarrier*  pImageMemoryBarriers;
 } PipelineBarrierParameters;
-void TransitionImageLayout(PipelineBarrierParameters* parameters);
+void PipelineBarrier(PipelineBarrierParameters* parameters);
 
 VkMemoryAllocateInfo MemoryAllocateInfo(VkImage               image,
                                         VkMemoryPropertyFlags requestedProperties,

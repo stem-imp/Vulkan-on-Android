@@ -467,7 +467,7 @@ VkSemaphore CreateSemaphore(VkDevice device, VkSemaphoreCreateFlags flags, const
 //
 //    CreateImage(swapchainInfo.extent.width, swapchainInfo.extent.height, 1, depthFormat, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, swapchainInfo.depthImageInfo[i].image, swapchainInfo.depthImageInfo[i].memory, deviceInfo);
 //    swapchainInfo.depthImageInfo[i].view = CreateImageView(swapchainInfo.depthImageInfo[i].image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1, deviceInfo.logicalDevices[0]);
-//    TransitionImageLayout(swapchainInfo.depthImageInfo[i].image, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 1, commandInfo, deviceInfo);
+//    PipelineBarrier(swapchainInfo.depthImageInfo[i].image, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 1, commandInfo, deviceInfo);
 //}
 
 
@@ -531,7 +531,7 @@ VkImageMemoryBarrier ImageMemoryBarrier(VkAccessFlags           srcAccessMask,
     return imageMemoryBarrier;
 }
 
-void TransitionImageLayout(PipelineBarrierParameters* parameters)
+void PipelineBarrier(PipelineBarrierParameters* parameters)
 {
     vkCmdPipelineBarrier(parameters->commandBuffer,
                          parameters->srcStageMask,

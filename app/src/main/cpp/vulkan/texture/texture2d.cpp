@@ -40,7 +40,7 @@ namespace Vulkan
                                                           image,
                                                           { VK_IMAGE_ASPECT_COLOR_BIT, 0, textureAttribs.mipmapLevels, 0, 1 });
         pipelineBarrierParameters.pImageMemoryBarriers = &barrier;
-        TransitionImageLayout(&pipelineBarrierParameters);
+        PipelineBarrier(&pipelineBarrierParameters);
         VkBufferImageCopy region = BufferImageCopy({ textureAttribs.width, textureAttribs.height, 1 },
                                                    { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
         vkCmdCopyBufferToImage(cmds[0], stagingBuffer.GetBuffer(), image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
