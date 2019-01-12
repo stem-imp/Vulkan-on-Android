@@ -13,12 +13,8 @@ namespace Vulkan
         VkDevice d = device.LogicalDevice();
         vkGetImageMemoryRequirements(d, image, &memoryRequirements);
 
-        VkMemoryAllocateInfo allocInfo = {};
-        allocInfo.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.pNext           = pNext;
-        allocInfo.allocationSize  = memoryRequirements.size;
-        uint32_t memoryTypeIndex = MapMemoryTypeToIndex(device.PhysicalDevice(), memoryRequirements.memoryTypeBits, preferredProperties);
-        allocInfo.memoryTypeIndex = memoryTypeIndex;
+        uint32_t memoryTypeIndex;
+        VkMemoryAllocateInfo allocInfo = MemoryAllocateInfo(image, preferredProperties, device, memoryRequirements, memoryTypeIndex);
         VK_CHECK_RESULT(vkAllocateMemory(d, &allocInfo, nullptr, &memory));
     }
 
