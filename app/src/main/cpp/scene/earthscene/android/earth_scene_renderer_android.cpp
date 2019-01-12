@@ -95,7 +95,7 @@ EarthSceneRenderer::EarthSceneRenderer(void* application, uint32_t screenWidth, 
     Model& model = models[0];
     string filePath = string(app->activity->externalDataPath) + string("/earth/");
     Texture::TextureAttribs textureAttribs;
-    ModelCreateInfo modelCreateInfo = { 0.001953125f, 1.0f };
+    ModelCreateInfo modelCreateInfo = { 0.001953125f, 1.0f, true };
     if (model.ReadFile(filePath, string("earth.obj"), Model::DEFAULT_READ_FILE_FLAGS, &modelCreateInfo)) {
         for (const auto& n : model.Materials()) {
             for (const auto& it: n.textures) {

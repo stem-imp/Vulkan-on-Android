@@ -62,6 +62,9 @@ namespace Vulkan
             bool hasUVs = mesh->HasTextureCoords(0);
             aiColor3D pColor(0.f, 0.f, 0.f);
             bool hasColors = (scene->mMaterials[mesh->mMaterialIndex]->Get(AI_MATKEY_COLOR_DIFFUSE, pColor) == aiReturn_SUCCESS);
+            if (modelInfo && modelInfo->skipColor) {
+                hasColors = false;
+            }
             bool hasTangentsAndBitangents = mesh->HasTangentsAndBitangents();
             int baseOffset = 0;
             if (hasPositions) {
