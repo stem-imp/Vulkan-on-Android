@@ -1,4 +1,4 @@
-#version 440
+/*#version 440
 
 #extension GL_ARB_separate_shader_objects : enable
 
@@ -23,4 +23,4 @@ void main()
    gl_Position = dynamicVP.projection * dynamicVP.view * mvp.model * vec4(inPosition, 1.0);
    fragColor = inColor;
    fragTexCoord = inTexCoord;
-}
+}*/
