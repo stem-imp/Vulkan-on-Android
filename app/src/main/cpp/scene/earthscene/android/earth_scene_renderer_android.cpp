@@ -48,7 +48,7 @@ EarthSceneRenderer::EarthSceneRenderer(void* application, uint32_t screenWidth, 
     VkPhysicalDeviceFeatures requestedFeatures = {};
     requestedFeatures.samplerAnisotropy = VK_TRUE;
     device = new Device(SelectPhysicalDevice(*instance, *surface, requestedExtNames, VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT, requestedFeatures));
-    VkPhysicalDeviceFeatures featuresRequested = {};
+    VkPhysicalDeviceFeatures featuresRequested = { .samplerAnisotropy = VK_TRUE };
     device->BuildDevice(featuresRequested, requestedExtNames);
 
     swapchain = new Swapchain(*surface, *device);
@@ -95,7 +95,7 @@ EarthSceneRenderer::EarthSceneRenderer(void* application, uint32_t screenWidth, 
     Model& model = models[0];
     string filePath = string(app->activity->externalDataPath) + string("/earth/");
     Texture::TextureAttribs textureAttribs;
-    ModelCreateInfo modelCreateInfo = { 0.001953125f, 1.0f, true };
+    ModelCreateInfo modelCreateInfo = { 0.001953125f, 1.0f, true, false };
     if (model.ReadFile(filePath, string("earth.obj"), Model::DEFAULT_READ_FILE_FLAGS, &modelCreateInfo)) {
         for (const auto& n : model.Materials()) {
             for (const auto& it: n.textures) {
@@ -552,7 +552,7 @@ void EarthSceneRenderer::RenderImpl()
 
 void EarthSceneRenderer::RebuildSwapchain()
 {
-    DebugLog("~EarthSceneRenderer()");
+    DebugLog("RebuildSwapchain()");
 
     VkDevice d = device->LogicalDevice();
 

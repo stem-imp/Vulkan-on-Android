@@ -66,6 +66,9 @@ namespace Vulkan
                 hasColors = false;
             }
             bool hasTangentsAndBitangents = mesh->HasTangentsAndBitangents();
+            if (modelInfo && modelInfo->skipTangent) {
+                hasTangentsAndBitangents = false;
+            }
             int baseOffset = 0;
             if (hasPositions) {
                 _vertexLayouts[i].components.push_back(VERTEX_COMPONENT_POSITION);

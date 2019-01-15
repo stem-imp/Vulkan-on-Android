@@ -62,24 +62,27 @@ namespace Vulkan
     };
 
     typedef struct ModelCreateInfo {
-        vec3 scale     = vec3(1.0f);
-        vec2 uvScale   = vec2(1.0f);
-        bool skipColor = false;
+        vec3 scale       = vec3(1.0f);
+        vec2 uvScale     = vec2(1.0f);
+        bool skipColor   = false;
+        bool skipTangent = false;
 
         ModelCreateInfo() {};
 
-        ModelCreateInfo(vec3 scale, vec2 uvScale, bool skipColor)
+        ModelCreateInfo(vec3 scale, vec2 uvScale, bool skipColor, bool skipTangent)
         {
-            this->scale     = scale;
-            this->uvScale   = uvScale;
-            this->skipColor = skipColor;
+            this->scale       = scale;
+            this->uvScale     = uvScale;
+            this->skipColor   = skipColor;
+            this->skipTangent = skipTangent;
         }
 
-        ModelCreateInfo(float scale, float uvScale, bool skipColor)
+        ModelCreateInfo(float scale, float uvScale, bool skipColor, bool skipTangent)
         {
-            this->scale     = vec3(scale);
-            this->uvScale   = vec2(uvScale);
-            this->skipColor = skipColor;
+            this->scale       = vec3(scale);
+            this->uvScale     = vec2(uvScale);
+            this->skipColor   = skipColor;
+            this->skipTangent = skipTangent;
         }
     } ModelCreateInfo;
 
