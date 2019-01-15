@@ -189,15 +189,12 @@
 #include "log/log.h"
 #include "scene/emptyscene/empty_scene.h"
 #include "scene/earthscene/earth_scene.h"
-
-#include "assimp/Importer.hpp"
-#include "assimp/scene.h"
-#include "assimp/postprocess.h"
+#include "scene/msaascene/msaa_scene.h"
 
 using Utility::Log;
 
 void android_main(struct android_app* state)
 {
     Log::Tag = "vulkan";
-    EarthScene earthScene((void*)state);
+    MSAAScene msaaScene((void*)state);
 }
