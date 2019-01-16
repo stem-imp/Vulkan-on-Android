@@ -16,10 +16,10 @@ namespace Vulkan
     {
         const Device &device = _device;
         VkFormat colorFormat = getFormat();
-        VkSampleCountFlagBits sampls = getSampleCount();
+        VkSampleCountFlagBits samples = getSampleCount();
         VkAttachmentDescription colorAttachment = {};
         colorAttachment.format = colorFormat;
-        colorAttachment.samples = sampls;
+        colorAttachment.samples = samples;
         colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         // After resolving the texture, we do not need to preserve it, so use DONT_CARE for storeOp here.
         colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -34,7 +34,7 @@ namespace Vulkan
                                                  VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT,
                                                  device.PhysicalDevice());
         depthAttachment.format = _depthFormat;
-        depthAttachment.samples = sampls;
+        depthAttachment.samples = samples;
         depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
