@@ -22,7 +22,7 @@ public:
 
     void RenderImpl() override;
 
-    void UpdateUniformBuffers(const vector<ModelTransform>& modelTransforms,
+    void UpdateUniformBuffers(const vector<mat4>& modelTransforms,
                               const vector<int>& modelTransformSizes,
                               const ViewProjectionTransform& lViewProj,
                               const ViewProjectionTransform& rViewProj,

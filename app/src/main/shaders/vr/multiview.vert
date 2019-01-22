@@ -12,7 +12,7 @@ out gl_PerVertex
 void main()
 {
     outUV = inPosition.xy;
-	float K1 = 0;//-0.046875;
+	float K1 = -0.046875;
 	//float K2 = 0;
 	float r2 = dot(inPosition.xy, inPosition.xy);
 	//float r4 = r2 * r2;

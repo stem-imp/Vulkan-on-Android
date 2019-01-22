@@ -37,7 +37,7 @@ private:
 
     // ==== Vulkan ==== //
     vector<Model>           _models;
-    vector<ModelTransform>  _modelTransforms;
+    vector<mat4>  _modelTransforms;
     ViewProjectionTransform _lViewProjTransform;
     ViewProjectionTransform _rViewProjTransform;
 };

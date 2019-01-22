@@ -32,7 +32,7 @@ static void OnLowMemory(void);
 StereoViewingScene::StereoViewingScene(void* state) : Scene(state),
                                                       _worldSpaceCameraPos(0.0f, 0.0f, 2.0f),
                                                       _fov(45.0f),
-                                                      _zNear(0.125f), _zFar(16.0f),
+                                                      _zNear(0.125f), _zFar(128.0f),
                                                       _focalLength(0.5f),
                                                       _eyeSeparation(0.08f)
 {
@@ -106,16 +106,16 @@ StereoViewingScene::StereoViewingScene(void* state) : Scene(state),
 
     android_app* app = (android_app*)state;
     _models.emplace_back(Model());
-    _modelTransforms.emplace_back(ModelTransform());
+    _modelTransforms.emplace_back(mat4(1.0));
     Model& model = _models[0];
-    string filePath = string(app->activity->externalDataPath) + string("/cuberb1k/");
+    string filePath = string(app->activity->externalDataPath) + string("/earth/");
     //Texture::TextureAttribs textureAttribs;
-    ModelCreateInfo modelCreateInfo = { 0.015625f, 1.0f, true, true };
-    if (model.ReadFile(filePath, string("cube.obj"), Model::DEFAULT_READ_FILE_FLAGS, &modelCreateInfo)) {
+    ModelCreateInfo modelCreateInfo = { 0.001953125f, 1.0f, true, false };
+    if (model.ReadFile(filePath, string("earth.obj"), Model::DEFAULT_READ_FILE_FLAGS, &modelCreateInfo)) {
         //_modelResources.emplace_back(*device);
         //_modelResources[_modelResources.size() - 1].UploadToGPU(model, *command);
     } else {
-        Log::Error("%s: file not found.", (filePath + string("cube.obj")).c_str());
+        Log::Error("%s: file not found.", (filePath + string("earth.obj")).c_str());
         _models.pop_back();
     }
 
@@ -173,8 +173,7 @@ bool StereoViewingScene::UpdateImpl()
     StereoViewingSceneRenderer* concreteRenderer = (StereoViewingSceneRenderer*)renderer;
     auto now = high_resolution_clock::now();
     float elapsedTime = duration<float, seconds::period>(now - startTime).count();
-    _modelTransforms[0].modelTransform = glm::rotate(mat4(1.0f), glm::radians(elapsedTime * 16.0f), vec3(1.5f, 0.5f, -1.0f));
-    _modelTransforms[0].modelTransformInverse = glm::inverse(_modelTransforms[0].modelTransform);
+    _modelTransforms[0] = glm::rotate(mat4(1.0f), glm::radians(elapsedTime * 16.0f), vec3(1.5f, 0.5f, -1.0f));
 
     float aspectRatio = (_screenWidth * 0.5f) / _screenHeight;
     float wd2 = _zNear * tan(glm::radians(_fov / 2.0f));
@@ -185,17 +184,17 @@ bool StereoViewingScene::UpdateImpl()
 
     left = -aspectRatio * wd2 + 0.5f * _eyeSeparation * ndfl;
     right = aspectRatio * wd2 + 0.5f * _eyeSeparation * ndfl;
-    _lViewProjTransform.view = lookAt(vec3(-0.5f * _eyeSeparation, 0.0f, 6.0f), vec3(-0.5f * _eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    _lViewProjTransform.view = lookAt(vec3(-0.5f * _eyeSeparation, 0.0f, 32.0f), vec3(-0.5f * _eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
     _lViewProjTransform.projection = glm::frustum(left, right, bottom, top, _zNear, _zFar);
     _lViewProjTransform.projection[1][1] *= -1;
 
     left = -aspectRatio * wd2 - 0.5f * _eyeSeparation * ndfl;
     right = aspectRatio * wd2 - 0.5f * _eyeSeparation * ndfl;
-    _rViewProjTransform.view = lookAt(vec3(0.5f * _eyeSeparation, 0.0f, 6.0f), vec3(0.5f * _eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    _rViewProjTransform.view = lookAt(vec3(0.5f * _eyeSeparation, 0.0f, 32.0f), vec3(0.5f * _eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
     _rViewProjTransform.projection = glm::frustum(left, right, bottom, top, _zNear, _zFar);
     _rViewProjTransform.projection[1][1] *= -1;
 
-    vector<int> modelTransformSizes = { sizeof(ModelTransform) };
+    vector<int> modelTransformSizes = { sizeof(mat4) };
     concreteRenderer->UpdateUniformBuffers(_modelTransforms, modelTransformSizes, _lViewProjTransform, _rViewProjTransform, sizeof(ViewProjectionTransform));
     return true;
 }

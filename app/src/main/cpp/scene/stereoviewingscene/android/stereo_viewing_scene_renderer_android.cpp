@@ -69,7 +69,7 @@ StereoViewingSceneRenderer::StereoViewingSceneRenderer(void* application, uint32
 
 
     // Uniform Buffers: Model and Dynamic View and Projection Transform
-    VkDeviceSize modelTransformSize = sizeof(ModelTransform);
+    VkDeviceSize modelTransformSize = sizeof(mat4);
     _buffers.emplace_back(*device);
     Buffer& modelTransform = _buffers[0];
     modelTransform.BuildDefaultBuffer(modelTransformSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
@@ -323,7 +323,7 @@ void StereoViewingSceneRenderer::RenderImpl()
     currentFrameIndex = (currentFrameIndex + 1) % swapchain->ConcurrentFramesCount();
 }
 
-void StereoViewingSceneRenderer::UpdateUniformBuffers(const vector<ModelTransform>& modelTransforms,
+void StereoViewingSceneRenderer::UpdateUniformBuffers(const vector<mat4>& modelTransforms,
                                                       const vector<int>& modelTransformSizes,
                                                       const ViewProjectionTransform& lViewProj,
                                                       const ViewProjectionTransform& rViewProj,
@@ -344,7 +344,7 @@ void StereoViewingSceneRenderer::UpdateUniformBuffers(const vector<ModelTransfor
 void StereoViewingSceneRenderer::UploadModels(const vector<Model>& models)
 {
     android_app* app = (android_app*)_application;
-    string filePath = string(app->activity->externalDataPath) + string("/cuberb1k/");
+    string filePath = string(app->activity->externalDataPath) + string("/earth/");
     Texture::TextureAttribs textureAttribs;
     for (const auto& m : models) {
         for (const auto& n : m.Materials()) {
@@ -523,10 +523,17 @@ void StereoViewingSceneRenderer::BuildMSAADescriptorSetLayout()
     textureSamplerBinding.stageFlags         = VK_SHADER_STAGE_FRAGMENT_BIT;
     textureSamplerBinding.pImmutableSamplers = nullptr;
 
-    VkDescriptorSetLayoutBinding bindings[] = { modelTransformBinding, viewProjTransformBinding, textureSamplerBinding };
+    VkDescriptorSetLayoutBinding normalSamplerBinding = {};
+    normalSamplerBinding.binding            = 3;
+    normalSamplerBinding.descriptorType     = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    normalSamplerBinding.descriptorCount    = 1;
+    normalSamplerBinding.stageFlags         = VK_SHADER_STAGE_FRAGMENT_BIT;
+    normalSamplerBinding.pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutBinding bindings[] = { modelTransformBinding, viewProjTransformBinding, textureSamplerBinding, normalSamplerBinding };
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 3;
+    layoutInfo.bindingCount = 4;
     layoutInfo.pBindings = bindings;
     VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device->LogicalDevice(), &layoutInfo, nullptr, &_msaaDescriptorSetLayout));
 
@@ -563,7 +570,7 @@ void StereoViewingSceneRenderer::BuildDescriptorPool()
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
     poolSizes[1].descriptorCount = 1 * 2; // per eye
     poolSizes[2].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[2].descriptorCount = 1 + numOfImageViews * 2; // 1(model texture) + numOfImageViews(temporary rendering results) * 2(per eye)
+    poolSizes[2].descriptorCount = 1 + 1 + numOfImageViews * 2; // 1(model texture) + 1(normal texture) + numOfImageViews(temporary rendering results) * 2(per eye)
     VkDescriptorPoolCreateInfo descriptorPool = {};
     descriptorPool.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     descriptorPool.poolSizeCount = 3;
@@ -580,6 +587,7 @@ void StereoViewingSceneRenderer::BuildMSAADescriptorSet()
     descriptorSet.descriptorPool              = _descriptorPool;
     descriptorSet.descriptorSetCount          = 1;
     descriptorSet.pSetLayouts                 = &_msaaDescriptorSetLayout;
+    VK_CHECK_RESULT(vkAllocateDescriptorSets(device->LogicalDevice(), &descriptorSet, &_msaaDescriptorSet));
 
     VkDescriptorBufferInfo modelTransform = {};
     modelTransform.buffer = _buffers[0].GetBuffer();
@@ -593,12 +601,15 @@ void StereoViewingSceneRenderer::BuildMSAADescriptorSet()
 
     VkDescriptorImageInfo diffuseImage = {};
     diffuseImage.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    diffuseImage.imageView = _modelTextures[0].ImageView();
-    diffuseImage.sampler = _textureSamplers[0];
+    diffuseImage.imageView = _modelTextures[1].ImageView();
+    diffuseImage.sampler = _textureSamplers[1];
 
-    VK_CHECK_RESULT(vkAllocateDescriptorSets(device->LogicalDevice(), &descriptorSet, &_msaaDescriptorSet));
+    VkDescriptorImageInfo normalImage = {};
+    normalImage.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    normalImage.imageView = _modelTextures[0].ImageView();
+    normalImage.sampler = _textureSamplers[0];
 
-    VkWriteDescriptorSet descriptorWrites[] = { {}, {}, {} };
+    VkWriteDescriptorSet descriptorWrites[] = { {}, {}, {}, {} };
     descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrites[0].dstSet = _msaaDescriptorSet;
     descriptorWrites[0].dstBinding = 0;
@@ -623,7 +634,15 @@ void StereoViewingSceneRenderer::BuildMSAADescriptorSet()
     descriptorWrites[2].descriptorCount = 1;
     descriptorWrites[2].pImageInfo = &diffuseImage;
 
-    vkUpdateDescriptorSets(device->LogicalDevice(), 3, descriptorWrites, 0, nullptr);
+    descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[3].dstSet = _msaaDescriptorSet;
+    descriptorWrites[3].dstBinding = 3;
+    descriptorWrites[3].dstArrayElement = 0;
+    descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptorWrites[3].descriptorCount = 1;
+    descriptorWrites[3].pImageInfo = &normalImage;
+
+    vkUpdateDescriptorSets(device->LogicalDevice(), 4, descriptorWrites, 0, nullptr);
 }
 
 void StereoViewingSceneRenderer::BuildMultiViewDescriptorSet(int eye)
@@ -663,8 +682,8 @@ void StereoViewingSceneRenderer::BuildMSAAPipeline(void* application, const Vert
 {
     android_app* app = (android_app*)application;
     vector<char*> vertFile, fragFile;
-    AndroidNative::Open<char*>("shaders/vr/blinn_phong_shading_wo_normal_map.vert.spv", app, vertFile);
-    AndroidNative::Open<char*>("shaders/vr/blinn_phong_shading_wo_normal_map.frag.spv", app, fragFile);
+    AndroidNative::Open<char*>("shaders/vr/blinn_phong_shading.vert.spv", app, vertFile);
+    AndroidNative::Open<char*>("shaders/vr/blinn_phong_shading.frag.spv", app, fragFile);
     VkShaderModuleCreateInfo vertModule = ShaderModuleCreateInfo(vertFile);
     VkShaderModuleCreateInfo fragModule = ShaderModuleCreateInfo(fragFile);
     VkShaderModule vertexShader;
@@ -752,8 +771,8 @@ void StereoViewingSceneRenderer::BuildMultiviewPipeline(void* application, const
 {
     android_app* app = (android_app*)application;
     vector<char*> vertFile, fragFile;
-    AndroidNative::Open<char*>("shaders/multiview.vert.spv", app, vertFile);
-    AndroidNative::Open<char*>("shaders/multiview.frag.spv", app, fragFile);
+    AndroidNative::Open<char*>("shaders/vr/multiview.vert.spv", app, vertFile);
+    AndroidNative::Open<char*>("shaders/vr/multiview.frag.spv", app, fragFile);
     VkShaderModuleCreateInfo vertModule = ShaderModuleCreateInfo(vertFile);
     VkShaderModuleCreateInfo fragModule = ShaderModuleCreateInfo(fragFile);
     VkShaderModule vertexShader;
