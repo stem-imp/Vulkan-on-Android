@@ -55,23 +55,33 @@ namespace Vulkan
 
     void Buffer::BuildDefaultBuffer(VkDeviceSize          size,
                                     VkBufferUsageFlags    usage,
-                                    VkMemoryPropertyFlags preferredProperties)
+                                    VkMemoryPropertyFlags preferredProperties,
+                                    VkMemoryRequirements* memoryRequirements)
     {
         CreateBuffer(size, usage);
-        VkMemoryRequirements memRequirements;
-        AllocateBuffer(memRequirements, preferredProperties);
+        if (!memoryRequirements) {
+            VkMemoryRequirements memRequirements;
+            AllocateBuffer(memRequirements, preferredProperties);
+        } else {
+            AllocateBuffer(*memoryRequirements, preferredProperties);
+        }
         BindBuffer();
     }
 
     void Buffer::BuildExtendedBuffer(VkDeviceSize             size,
                                      VkBufferUsageFlags       usage,
                                      VkMemoryPropertyFlags    preferredProperties,
-                                     ExtendedBufferParameter& extendedBufferParameter)
+                                     ExtendedBufferParameter& extendedBufferParameter,
+                                     VkMemoryRequirements* memoryRequirements)
     {
         ExtendedBufferParameter& p = extendedBufferParameter;
         CreateBuffer(size, usage, p.create.pNext, p.create.flags, p.create.sharingMode, p.create.queueFamilyIndexCount, p.create.pQueueFamilyIndices);
-        VkMemoryRequirements memRequirements;
-        AllocateBuffer(memRequirements, preferredProperties);
+        if (!memoryRequirements) {
+            VkMemoryRequirements memRequirements;
+            AllocateBuffer(memRequirements, preferredProperties);
+        } else {
+            AllocateBuffer(*memoryRequirements, preferredProperties);
+        }
         BindBuffer(p.allocateAndBind.memoryOffset);
     }
 

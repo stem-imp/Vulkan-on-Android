@@ -12,6 +12,9 @@ namespace Vulkan
         ~MSAARenderPass() override;
 
         VkFormat DepthFormat() const { return _depthFormat; }
+
+    protected:
+        void CreateRenderPassFlow(VkImageLayout finalLayout, VkImageLayout resolvedFinalLayout);
     private:
         virtual void CreateRenderPassImpl() override;
 

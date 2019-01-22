@@ -2,7 +2,6 @@
 #define APP_SCENE_H
 
 #ifdef __ANDROID__
-#include <android_native_app_glue.h>
 #include "../androidutility/eventloop/event_loop.h"
 
 using AndroidNative::EventLoop;

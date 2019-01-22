@@ -11,6 +11,7 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <utility>
 
 using Utility::Log;
 using glm::vec2;
@@ -36,10 +37,18 @@ namespace Vulkan
         vector<Component> components;
         vector<uint32_t> offsets;
 
-        VertexLayout() { DebugLog("VertexLayout"); }
-        VertexLayout(vector<Component> other)
+        VertexLayout() { DebugLog("VertexLayout()"); }
+        VertexLayout(const VertexLayout& other)
         {
-            components = std::move(other);
+            DebugLog("VertexLayout(VertexLayout&)");
+            components = other.components;
+            offsets = other.offsets;
+        }
+        VertexLayout(VertexLayout&& other)
+        {
+            DebugLog("VertexLayout(VertexLayout&&)");
+            components = other.components;
+            offsets = other.offsets;
         }
 
         uint32_t Stride() const
@@ -95,7 +104,40 @@ namespace Vulkan
     class Model
     {
     public:
+        typedef struct Mesh {
+            vector<float> vertexBuffer;
+            vector<uint32_t> indexBuffer;
+        } Mesh;
+
+        typedef struct Dimension
+        {
+            vec3 min = vec3(FLT_MAX);
+            vec3 max = vec3(-FLT_MAX);
+            vec3 size;
+        } Dimension;
+
+        typedef struct Material
+        {
+            Material() { DebugLog("Material()"); }
+            Material(Material&& other)
+            {
+                DebugLog("Material(Material&&)");
+                textures = std::move(other.textures);
+            }
+
+            unordered_map<int, vector<string>> textures;
+        } Material;
+
         Model() { DebugLog("Model()"); }
+        Model(vector<Mesh>&& subMeshes, vector<VertexLayout>&& vertexLayouts, Dimension& dimension, vector<int>&& materialIndices, vector<Material>&& materials)
+        {
+            DebugLog("Model() move args");
+            _subMeshes       = subMeshes;
+            _vertexLayouts   = std::forward<vector<VertexLayout>>(vertexLayouts);
+            _dimension       = dimension;
+            _materialIndices = materialIndices;
+            _materials       = std::forward<vector<Material>>(materials);
+        }
         Model(Model&& other)
         {
             DebugLog("Model(Model&&)");
@@ -114,32 +156,9 @@ namespace Vulkan
 
         const aiScene* scene;
 
-        typedef struct Mesh {
-            vector<float> vertexBuffer;
-            vector<uint32_t> indexBuffer;
-        } Mesh;
-
-        typedef struct Dimension
-        {
-            vec3 min = vec3(FLT_MAX);
-            vec3 max = vec3(-FLT_MAX);
-            vec3 size;
-        } Dimension;
-
         const vector<Mesh>& Submeshes() const { return _subMeshes; }
         const vector<VertexLayout>& VertexLayouts() const { return _vertexLayouts; }
 
-        typedef struct Material
-        {
-            Material() { DebugLog("Material()"); }
-            Material(Material&& other)
-            {
-                { DebugLog("Material(Material&&)"); }
-                textures = std::move(other.textures);
-            }
-
-            unordered_map<int, vector<string>> textures;
-        } Material;
         const vector<Material>& Materials() const { return _materials; }
     private:
         void LoadMaterialTextures(aiMaterial* mat, aiTextureType type, string typeName);

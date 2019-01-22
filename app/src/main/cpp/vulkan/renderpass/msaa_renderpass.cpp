@@ -12,7 +12,7 @@ namespace Vulkan
         _renderPass = VK_NULL_HANDLE;
     }
 
-    void MSAARenderPass::CreateRenderPassImpl()
+    void MSAARenderPass::CreateRenderPassFlow(VkImageLayout cololorFinalLayout, VkImageLayout resolvedFinalLayout)
     {
         const Device &device = _device;
         VkFormat colorFormat = getFormat();
@@ -26,7 +26,7 @@ namespace Vulkan
         colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        colorAttachment.finalLayout = cololorFinalLayout;
 
         VkAttachmentDescription depthAttachment = {};
         _depthFormat = FindDeviceSupportedFormat({ VK_FORMAT_D16_UNORM, VK_FORMAT_D16_UNORM_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT },
@@ -51,7 +51,7 @@ namespace Vulkan
         resolveAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         resolveAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         resolveAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        resolveAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        resolveAttachment.finalLayout = resolvedFinalLayout;
 
         VkAttachmentReference colorReference = {};
         colorReference.attachment = 0;
@@ -102,5 +102,10 @@ namespace Vulkan
             renderPassInfo.pDependencies = dependencies;
         }
         VK_CHECK_RESULT(vkCreateRenderPass(device.LogicalDevice(), &renderPassInfo, nullptr, &_renderPass));
+    }
+
+    void MSAARenderPass::CreateRenderPassImpl()
+    {
+        CreateRenderPassFlow(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
     }
 }

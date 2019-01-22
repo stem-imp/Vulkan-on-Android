@@ -58,11 +58,14 @@ namespace Vulkan
 
         VkPhysicalDevice PhysicalDevice() const { return _physicalDevice; }
         VkDevice LogicalDevice() const { return _device; }
+
         const QueueGroup& FamilyQueues() const { return _familyQueues; }
         bool DedicatedComputeQueueFamily() const { return _dedicatedComputeQueueFamily; }
         bool DedicatedTransferQueueFamily() const { return _dedicatedTransferQueueFamily; }
         bool DedicatedSparseBindingQueueFamily() const { return _dedicatedSparseBindingQueueFamily; }
         bool SharedGraphicsAndPresentQueueFamily() const { return _sharedGraphicsAndPresentQueueFamily; }
+
+        const VkPhysicalDeviceProperties& PhysicalDeviceProperties() const { return  _properties; }
 
         VkQueueFlags queueFlags;
     private:

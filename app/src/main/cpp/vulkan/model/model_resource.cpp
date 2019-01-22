@@ -13,10 +13,13 @@ namespace Vulkan
         DebugLog("ModelResource()");
     }
 
-    ModelResource::ModelResource(ModelResource&& other) : device(other.device), vertices(std::move(other.vertices)), indices(std::move(other.indices))
+    ModelResource::ModelResource(ModelResource&& other) : subMeshes(std::move(other.subMeshes)),
+                                                          device(other.device),
+                                                          vertices(std::move(other.vertices)),
+                                                          indices(std::move(other.indices)),
+                                                          indicesCount(other.indicesCount)
     {
         DebugLog("ModelResource(ModelResource&&)");
-        subMeshes   = std::move(other.subMeshes);
     }
 
     ModelResource::~ModelResource()

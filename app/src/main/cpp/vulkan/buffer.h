@@ -52,11 +52,13 @@ namespace Vulkan {
 
         void BuildDefaultBuffer(VkDeviceSize          size,
                                 VkBufferUsageFlags    usage,
-                                VkMemoryPropertyFlags preferredProperties);
+                                VkMemoryPropertyFlags preferredProperties,
+                                VkMemoryRequirements* memoryRequirements = nullptr);
         void BuildExtendedBuffer(VkDeviceSize             size,
                                  VkBufferUsageFlags       usage,
                                  VkMemoryPropertyFlags    preferredProperties,
-                                 ExtendedBufferParameter& extendedBufferParameter);
+                                 ExtendedBufferParameter& extendedBufferParameter,
+                                 VkMemoryRequirements* memoryRequirements = nullptr);
 
         void Map(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0)
         {
