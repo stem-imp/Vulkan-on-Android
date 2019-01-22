@@ -190,11 +190,12 @@
 #include "scene/emptyscene/empty_scene.h"
 #include "scene/earthscene/earth_scene.h"
 #include "scene/msaascene/msaa_scene.h"
+#include "scene/stereoviewingscene/stereo_viewing_scene.h"
 
 using Utility::Log;
 
 void android_main(struct android_app* state)
 {
     Log::Tag = "vulkan";
-    MSAAScene msaaScene((void*)state);
+    StereoViewingScene stereoViewingScene((void*)state);
 }

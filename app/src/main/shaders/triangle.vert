@@ -6,7 +6,7 @@ layout(binding = 0) uniform MVP {
     mat4 model;
 } mvp;
 
-layout(binding = 1) uniform DynamicVP {
+layout(binding = 1) uniform ViewProjectionTransform {
     mat4 view;
     mat4 projection;
 } dynamicVP;

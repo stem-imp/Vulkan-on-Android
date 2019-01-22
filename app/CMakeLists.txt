@@ -106,6 +106,8 @@ add_library( # Sets the name of the library.
              src/main/cpp/scene/earthscene/android/earth_scene_android.cpp
              src/main/cpp/scene/msaascene/android/msaa_scene_android.cpp
              src/main/cpp/scene/msaascene/android/msaa_scene_renderer_android.cpp
+             src/main/cpp/scene/stereoviewingscene/android/stereo_viewing_scene_android.cpp
+             src/main/cpp/scene/stereoviewingscene/android/stereo_viewing_scene_renderer_android.cpp
              src/main/cpp/scene/scene.cpp
              src/main/cpp/main.cpp )
 
