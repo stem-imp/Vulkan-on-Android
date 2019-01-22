@@ -267,7 +267,7 @@ void StereoViewingSceneRenderer::RenderImpl()
     if (orientationChanged) {
         DebugLog("Orientation changed.");
         orientationChanged = false;
-        //RebuildSwapchain();
+        RebuildSwapchain();
         return;
     }
 
@@ -882,7 +882,6 @@ void StereoViewingSceneRenderer::BuildCommandBuffers(int index)
     vkCmdBindIndexBuffer(_commandBuffers.buffers[index], _modelResources[0].IndexBuffer().GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
     uint32_t dynamicOffsets = 0;
     vkCmdBindDescriptorSets(_commandBuffers.buffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, _msaaPipelineLayout, 0, 1, &_msaaDescriptorSet, 1, &dynamicOffsets);
-    uint32_t ic = _modelResources[0].IndicesCount();
     vkCmdDrawIndexed(_commandBuffers.buffers[index], _modelResources[0].IndicesCount(), 1, 0, 0, 0);
     vkCmdEndRenderPass(_commandBuffers.buffers[index]);
 
@@ -971,9 +970,6 @@ void StereoViewingSceneRenderer::RebuildSwapchain()
     BuildMSAAResolvedImages(0);
     BuildMSAAResolvedImages(1);
 
-    BuildMSAADescriptorSetLayout();
-    BuildMultiviewDescriptorSetLayout();
-    BuildDescriptorPool();
     BuildMSAADescriptorSet();
     BuildMultiViewDescriptorSet(0);
     BuildMultiViewDescriptorSet(1);
