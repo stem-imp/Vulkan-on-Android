@@ -24,6 +24,7 @@ using std::max;
 
 static unordered_map<int, int> currentFrameToImageindex;
 static unordered_map<int, int> imageIndexToCurrentFrame;
+static vector<bool> fenceSubmissionRecords;
 
 StereoViewingSceneRenderer::StereoViewingSceneRenderer(void* application, uint32_t screenWidth, uint32_t screenHeight) : Renderer(application, screenWidth, screenHeight)
 {
@@ -62,11 +63,10 @@ StereoViewingSceneRenderer::StereoViewingSceneRenderer(void* application, uint32
     imageAvailableSemaphores.resize(concurrentFramesCount);
     commandsCompleteSemaphores.resize(concurrentFramesCount);
     for (int i = 0; i < concurrentFramesCount; i++) {
-        multiFrameFences[i]           = CreateFence(d);
+        multiFrameFences[i]           = CreateFence(d, 0);
         imageAvailableSemaphores[i]   = CreateSemaphore(d);
         commandsCompleteSemaphores[i] = CreateSemaphore(d);
     }
-
 
     // Uniform Buffers: Model and Dynamic View and Projection Transform
     VkDeviceSize modelTransformSize = sizeof(mat4);
@@ -267,20 +267,30 @@ void StereoViewingSceneRenderer::RenderImpl()
     if (orientationChanged) {
         DebugLog("Orientation changed.");
         orientationChanged = false;
+        currentFrameToImageindex.clear();
+        imageIndexToCurrentFrame.clear();
         RebuildSwapchain();
         return;
     }
 
     VkDevice d = device->LogicalDevice();
 
-    vkWaitForFences(d, 1, &multiFrameFences[currentFrameIndex], true, UINT64_MAX);
-    vkResetFences(d, 1, &multiFrameFences[currentFrameIndex]);
     if (currentFrameToImageindex.count(currentFrameIndex) > 0) {
+        vkWaitForFences(d, 1, &multiFrameFences[currentFrameIndex], true, UINT64_MAX);
+        vkResetFences(d, 1, &multiFrameFences[currentFrameIndex]);
         _lMsaaFramebuffers[currentFrameToImageindex[currentFrameIndex]].ReleaseFramebuffer();
         _rMsaaFramebuffers[currentFrameToImageindex[currentFrameIndex]].ReleaseFramebuffer();
         framebuffers[currentFrameToImageindex[currentFrameIndex]].ReleaseFramebuffer();
         currentFrameToImageindex.erase(currentFrameIndex);
     }
+//    vkWaitForFences(d, 1, &multiFrameFences[currentFrameIndex], true, UINT64_MAX);
+//    vkResetFences(d, 1, &multiFrameFences[currentFrameIndex]);
+//    if (currentFrameToImageindex.count(currentFrameIndex) > 0) {
+//        _lMsaaFramebuffers[currentFrameToImageindex[currentFrameIndex]].ReleaseFramebuffer();
+//        _rMsaaFramebuffers[currentFrameToImageindex[currentFrameIndex]].ReleaseFramebuffer();
+//        framebuffers[currentFrameToImageindex[currentFrameIndex]].ReleaseFramebuffer();
+//        currentFrameToImageindex.erase(currentFrameIndex);
+//    }
 
     uint32_t imageIndex;
     vkAcquireNextImageKHR(d, swapchain->GetSwapchain(), UINT64_MAX, imageAvailableSemaphores[currentFrameIndex], VK_NULL_HANDLE, &imageIndex);
@@ -301,8 +311,6 @@ void StereoViewingSceneRenderer::RenderImpl()
     _rMsaaFramebuffers[imageIndex].CreateSwapchainFramebuffer(renderPasses[0]->GetRenderPass(), attachments, e);
     attachments = { swapchain->ImageViews()[imageIndex] };
     framebuffers[imageIndex].CreateSwapchainFramebuffer(renderPasses[1]->GetRenderPass(), attachments, e);
-    currentFrameToImageindex[currentFrameIndex] = imageIndex;
-    imageIndexToCurrentFrame[imageIndex] = currentFrameIndex;
 
     BuildCommandBuffers(imageIndex);
 
@@ -317,6 +325,8 @@ void StereoViewingSceneRenderer::RenderImpl()
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = &commandsCompleteSemaphores[currentFrameIndex];
     VK_CHECK_RESULT(vkQueueSubmit(device->FamilyQueues().graphics.queue, 1, &submitInfo, multiFrameFences[currentFrameIndex]));
+    currentFrameToImageindex[currentFrameIndex] = imageIndex;
+    imageIndexToCurrentFrame[imageIndex] = currentFrameIndex;
 
     QueuePresent(&swapchain->GetSwapchain(), &imageIndex, *device, 1, &commandsCompleteSemaphores[currentFrameIndex]);
 
@@ -959,6 +969,13 @@ void StereoViewingSceneRenderer::BuildCommandBuffers(int index)
 
 void StereoViewingSceneRenderer::RebuildSwapchain()
 {
+    VkDevice d = device->LogicalDevice();
+    vkDeviceWaitIdle(d);
+    uint32_t concurrentFramesCount = swapchain->ConcurrentFramesCount();
+    vkWaitForFences(d, concurrentFramesCount, multiFrameFences.data(), true, UINT64_MAX);
+    vkResetFences(d, concurrentFramesCount, multiFrameFences.data());
+    currentFrameIndex = 0;
+
     DeleteSwapchainWithDependencies();
 
     BuildSwapchainWithDependencies();

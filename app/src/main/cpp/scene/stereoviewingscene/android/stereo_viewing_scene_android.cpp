@@ -95,10 +95,14 @@ StereoViewingScene::StereoViewingScene(void* state) : Scene(state),
 
     eventLoop.onSaveInstanceState = OnSaveInstanceState;
     eventLoop.onConfigurationChanged = [this](android_app* app) -> void {
+        if (!app->window) {
+            Log::Error("Window handle is null.");
+            return;
+        }
         DebugLog("App OnConfigurationChanged");
         _screenHeight = ANativeWindow_getWidth(app->window);
         _screenWidth = ANativeWindow_getHeight(app->window);
-        DebugLog("Old (width, height) = (%d, %d)", _screenWidth, _screenHeight);
+        DebugLog("Old (width, height) = (%d, %d)", _screenHeight, _screenWidth);
         renderer->SetScreenSize(_screenWidth, _screenHeight);
         renderer->ChangeOrientation();
     };
@@ -184,13 +188,13 @@ bool StereoViewingScene::UpdateImpl()
 
     left = -aspectRatio * wd2 + 0.5f * _eyeSeparation * ndfl;
     right = aspectRatio * wd2 + 0.5f * _eyeSeparation * ndfl;
-    _lViewProjTransform.view = lookAt(vec3(-0.5f * _eyeSeparation, 0.0f, 32.0f), vec3(-0.5f * _eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    _lViewProjTransform.view = lookAt(vec3(-0.5f * _eyeSeparation, 0.0f, 24.0f), vec3(-0.5f * _eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
     _lViewProjTransform.projection = glm::frustum(left, right, bottom, top, _zNear, _zFar);
     _lViewProjTransform.projection[1][1] *= -1;
 
     left = -aspectRatio * wd2 - 0.5f * _eyeSeparation * ndfl;
     right = aspectRatio * wd2 - 0.5f * _eyeSeparation * ndfl;
-    _rViewProjTransform.view = lookAt(vec3(0.5f * _eyeSeparation, 0.0f, 32.0f), vec3(0.5f * _eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    _rViewProjTransform.view = lookAt(vec3(0.5f * _eyeSeparation, 0.0f, 24.0f), vec3(0.5f * _eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
     _rViewProjTransform.projection = glm::frustum(left, right, bottom, top, _zNear, _zFar);
     _rViewProjTransform.projection[1][1] *= -1;
 
