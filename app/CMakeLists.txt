@@ -87,6 +87,7 @@ add_library( # Sets the name of the library.
              src/main/cpp/vulkan/renderpass/renderpass.cpp
              src/main/cpp/vulkan/renderpass/color_dst_renderpass.cpp
              src/main/cpp/vulkan/renderpass/color_depth_renderpass.cpp
+             src/main/cpp/vulkan/renderpass/msaa_shader_read_renderpass.cpp
              src/main/cpp/vulkan/renderpass/msaa_renderpass.cpp
              src/main/cpp/vulkan/framebuffer.cpp
              src/main/cpp/vulkan/command.cpp

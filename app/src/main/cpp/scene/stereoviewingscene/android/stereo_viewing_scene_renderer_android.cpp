@@ -1,7 +1,7 @@
 #ifdef __ANDROID__
 
 #include "../stereo_viewing_scene_renderer.h"
-#include "../../../vulkan/renderpass/msaa_wo_presentation_prenderpass.h"
+#include "../../../vulkan/renderpass/msaa_shader_read_renderpass.h"
 #include "../../../vulkan/renderpass/color_dst_renderpass.h"
 #include "../../../androidutility/assetmanager/io_asset.hpp"
 #include "../../../vulkan/model/model.h"
@@ -14,7 +14,7 @@ using Vulkan::Surface;
 using Vulkan::Device;
 using Vulkan::Swapchain;
 using Vulkan::RenderPass;
-using Vulkan::MSAAWOPresentationRenderPass;
+using Vulkan::MSAAShaderReadRenderPass;
 using Vulkan::ColorDestinationRenderPass;
 using Vulkan::VertexComponent;
 using Vulkan::VertexLayout;
@@ -22,9 +22,7 @@ using Vulkan::Model;
 using std::unordered_map;
 using std::max;
 
-static unordered_map<int, int> currentFrameToImageindex;
-static unordered_map<int, int> imageIndexToCurrentFrame;
-static vector<bool> fenceSubmissionRecords;
+static unordered_map<uint32_t, uint32_t> currentFrameToImageindex;
 
 StereoViewingSceneRenderer::StereoViewingSceneRenderer(void* application, uint32_t screenWidth, uint32_t screenHeight) : Renderer(application, screenWidth, screenHeight)
 {
@@ -57,15 +55,21 @@ StereoViewingSceneRenderer::StereoViewingSceneRenderer(void* application, uint32
                                                             VK_COMMAND_BUFFER_LEVEL_PRIMARY,
                                                             size,
                                                             d);
+    _msaaCommandBuffers.buffers = Command::CreateCommandBuffers(command->ShortLivedGraphcisPool(),
+                                                                VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+                                                                size,
+                                                                d);
 
     size_t concurrentFramesCount = swapchain->ConcurrentFramesCount();
+    msaaFences.resize(concurrentFramesCount);
     multiFrameFences.resize(concurrentFramesCount);
     imageAvailableSemaphores.resize(concurrentFramesCount);
     commandsCompleteSemaphores.resize(concurrentFramesCount);
     for (int i = 0; i < concurrentFramesCount; i++) {
-        multiFrameFences[i]           = CreateFence(d, 0);
         imageAvailableSemaphores[i]   = CreateSemaphore(d);
+        msaaFences[i]                 = CreateFence(d, 0);
         commandsCompleteSemaphores[i] = CreateSemaphore(d);
+        multiFrameFences[i]           = CreateFence(d, 0);
     }
 
     // Uniform Buffers: Model and Dynamic View and Projection Transform
@@ -99,6 +103,9 @@ StereoViewingSceneRenderer::~StereoViewingSceneRenderer()
 {
     DebugLog("~StereoViewingSceneRenderer()");
 
+    currentFrameIndex = 0;
+    currentFrameToImageindex.clear();
+
     uint32_t concurrentFramesCount = swapchain->ConcurrentFramesCount();
     DeleteSwapchainWithDependencies();
 
@@ -117,6 +124,7 @@ StereoViewingSceneRenderer::~StereoViewingSceneRenderer()
     _textureAttribsGroup.clear();
 
     for (int i = 0; i < concurrentFramesCount; i++) {
+        vkDestroyFence(d, msaaFences[i], nullptr), msaaFences[i] = VK_NULL_HANDLE;
         vkDestroyFence(d, multiFrameFences[i], nullptr), multiFrameFences[i] = VK_NULL_HANDLE;
         vkDestroySemaphore(d, imageAvailableSemaphores[i], nullptr), imageAvailableSemaphores[i] = VK_NULL_HANDLE;
         vkDestroySemaphore(d, commandsCompleteSemaphores[i], nullptr), commandsCompleteSemaphores[i] = VK_NULL_HANDLE;
@@ -143,7 +151,7 @@ void StereoViewingSceneRenderer::BuildSwapchainWithDependencies()
     BuildSwapchain(*swapchain);
 
     RenderPass* msaaRenderPass;
-    msaaRenderPass = new MSAAWOPresentationRenderPass(*device);
+    msaaRenderPass = new MSAAShaderReadRenderPass(*device);
     msaaRenderPass->getFormat = [this]() -> VkFormat { return swapchain->Format(); };
     msaaRenderPass->getSampleCount = [this]() -> VkSampleCountFlagBits { return _sampleCount; };
     msaaRenderPass->CreateRenderPass();
@@ -193,18 +201,18 @@ void StereoViewingSceneRenderer::DeleteSwapchainWithDependencies()
 
     vkDeviceWaitIdle(d);
 
-    vkDestroyImageView(d, _lMsaaView, nullptr)        , _lMsaaView         = VK_NULL_HANDLE;
-    vkDestroyImage(    d, _lMsaaImage, nullptr)       , _lMsaaImage        = VK_NULL_HANDLE;
-    vkFreeMemory(      d, _lMsaaImageMemory, nullptr) , _lMsaaImageMemory  = VK_NULL_HANDLE;
-    vkDestroyImageView(d, _lDepthView, nullptr)       , _lDepthView        = VK_NULL_HANDLE;
-    vkDestroyImage(    d, _lDepthImage, nullptr)      , _lDepthImage       = VK_NULL_HANDLE;
-    vkFreeMemory(      d, _lDepthImageMemory, nullptr), _lDepthImageMemory = VK_NULL_HANDLE;
-    vkDestroyImageView(d, _rMsaaView, nullptr)        , _rMsaaView         = VK_NULL_HANDLE;
-    vkDestroyImage(    d, _rMsaaImage, nullptr)       , _rMsaaImage        = VK_NULL_HANDLE;
-    vkFreeMemory(      d, _rMsaaImageMemory, nullptr) , _rMsaaImageMemory  = VK_NULL_HANDLE;
-    vkDestroyImageView(d, _rDepthView, nullptr)       , _rDepthView        = VK_NULL_HANDLE;
-    vkDestroyImage(    d, _rDepthImage, nullptr)      , _rDepthImage       = VK_NULL_HANDLE;
-    vkFreeMemory(      d, _rDepthImageMemory, nullptr), _rDepthImageMemory = VK_NULL_HANDLE;
+    vkDestroyImageView(d, _lMsaaView, nullptr), _lMsaaView = VK_NULL_HANDLE;
+    vkDestroyImage(d, _lMsaaImage, nullptr), _lMsaaImage = VK_NULL_HANDLE;
+    vkFreeMemory(d, _lMsaaImageMemory, nullptr), _lMsaaImageMemory = VK_NULL_HANDLE;
+    vkDestroyImageView(d, _lDepthView, nullptr), _lDepthView = VK_NULL_HANDLE;
+    vkDestroyImage(d, _lDepthImage, nullptr), _lDepthImage = VK_NULL_HANDLE;
+    vkFreeMemory(d, _lDepthImageMemory, nullptr), _lDepthImageMemory = VK_NULL_HANDLE;
+    vkDestroyImageView(d, _rMsaaView, nullptr), _rMsaaView = VK_NULL_HANDLE;
+    vkDestroyImage(d, _rMsaaImage, nullptr), _rMsaaImage = VK_NULL_HANDLE;
+    vkFreeMemory(d, _rMsaaImageMemory, nullptr), _rMsaaImageMemory = VK_NULL_HANDLE;
+    vkDestroyImageView(d, _rDepthView, nullptr), _rDepthView = VK_NULL_HANDLE;
+    vkDestroyImage(d, _rDepthImage, nullptr), _rDepthImage = VK_NULL_HANDLE;
+    vkFreeMemory(d, _rDepthImageMemory, nullptr), _rDepthImageMemory = VK_NULL_HANDLE;
 
     for (auto& view : _lMsaaResolvedViews) {
         vkDestroyImageView(d, view, nullptr), view = VK_NULL_HANDLE;
@@ -267,8 +275,6 @@ void StereoViewingSceneRenderer::RenderImpl()
     if (orientationChanged) {
         DebugLog("Orientation changed.");
         orientationChanged = false;
-        currentFrameToImageindex.clear();
-        imageIndexToCurrentFrame.clear();
         RebuildSwapchain();
         return;
     }
@@ -276,33 +282,15 @@ void StereoViewingSceneRenderer::RenderImpl()
     VkDevice d = device->LogicalDevice();
 
     if (currentFrameToImageindex.count(currentFrameIndex) > 0) {
-        vkWaitForFences(d, 1, &multiFrameFences[currentFrameIndex], true, UINT64_MAX);
-        vkResetFences(d, 1, &multiFrameFences[currentFrameIndex]);
-        _lMsaaFramebuffers[currentFrameToImageindex[currentFrameIndex]].ReleaseFramebuffer();
-        _rMsaaFramebuffers[currentFrameToImageindex[currentFrameIndex]].ReleaseFramebuffer();
+        VkFence fences[] = { multiFrameFences[currentFrameIndex] };
+        VK_CHECK_RESULT(vkWaitForFences(d, 1, fences, true, UINT64_MAX));
+        VK_CHECK_RESULT(vkResetFences(d, 1, fences));
         framebuffers[currentFrameToImageindex[currentFrameIndex]].ReleaseFramebuffer();
         currentFrameToImageindex.erase(currentFrameIndex);
     }
-//    vkWaitForFences(d, 1, &multiFrameFences[currentFrameIndex], true, UINT64_MAX);
-//    vkResetFences(d, 1, &multiFrameFences[currentFrameIndex]);
-//    if (currentFrameToImageindex.count(currentFrameIndex) > 0) {
-//        _lMsaaFramebuffers[currentFrameToImageindex[currentFrameIndex]].ReleaseFramebuffer();
-//        _rMsaaFramebuffers[currentFrameToImageindex[currentFrameIndex]].ReleaseFramebuffer();
-//        framebuffers[currentFrameToImageindex[currentFrameIndex]].ReleaseFramebuffer();
-//        currentFrameToImageindex.erase(currentFrameIndex);
-//    }
 
     uint32_t imageIndex;
     vkAcquireNextImageKHR(d, swapchain->GetSwapchain(), UINT64_MAX, imageAvailableSemaphores[currentFrameIndex], VK_NULL_HANDLE, &imageIndex);
-    if (imageIndexToCurrentFrame.count(imageIndex) > 0) {
-        vkWaitForFences(d, 1, &multiFrameFences[imageIndexToCurrentFrame[imageIndex]], true, UINT64_MAX);
-        vkResetFences(d, 1, &multiFrameFences[imageIndexToCurrentFrame[imageIndex]]);
-        _lMsaaFramebuffers[imageIndex].ReleaseFramebuffer();
-        _rMsaaFramebuffers[imageIndex].ReleaseFramebuffer();
-        framebuffers[imageIndex].ReleaseFramebuffer();
-        currentFrameToImageindex.erase(imageIndexToCurrentFrame[imageIndex]);
-        imageIndexToCurrentFrame.erase(imageIndex);
-    }
 
     vector<VkImageView> attachments = { _lMsaaView, _lDepthView, _lMsaaResolvedViews[imageIndex] };
     const VkExtent2D& e = swapchain->Extent();
@@ -316,17 +304,27 @@ void StereoViewingSceneRenderer::RenderImpl()
 
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &_msaaCommandBuffers.buffers[imageIndex];
+    VK_CHECK_RESULT(vkQueueSubmit(device->FamilyQueues().graphics.queue, 1, &submitInfo, msaaFences[currentFrameIndex]));
+
+    VK_CHECK_RESULT(vkWaitForFences(d, 1, &msaaFences[currentFrameIndex], true, UINT64_MAX));
+    VK_CHECK_RESULT(vkResetFences(d, 1, &msaaFences[currentFrameIndex]));
+    _lMsaaFramebuffers[imageIndex].ReleaseFramebuffer();
+    _rMsaaFramebuffers[imageIndex].ReleaseFramebuffer();
+
     submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = &imageAvailableSemaphores[currentFrameIndex];
-    VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-    submitInfo.pWaitDstStageMask = waitStages;
+    VkSemaphore multiviewWaitSemaphores[] = { imageAvailableSemaphores[currentFrameIndex] };
+    submitInfo.pWaitSemaphores = multiviewWaitSemaphores;
+    VkPipelineStageFlags multiviewWaitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+    submitInfo.pWaitDstStageMask = multiviewWaitStages;
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &_commandBuffers.buffers[imageIndex];
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = &commandsCompleteSemaphores[currentFrameIndex];
     VK_CHECK_RESULT(vkQueueSubmit(device->FamilyQueues().graphics.queue, 1, &submitInfo, multiFrameFences[currentFrameIndex]));
+
     currentFrameToImageindex[currentFrameIndex] = imageIndex;
-    imageIndexToCurrentFrame[imageIndex] = currentFrameIndex;
 
     QueuePresent(&swapchain->GetSwapchain(), &imageIndex, *device, 1, &commandsCompleteSemaphores[currentFrameIndex]);
 
@@ -410,27 +408,30 @@ void StereoViewingSceneRenderer::BuildMSAAImage(VkSampleCountFlagBits sampleCoun
                                                   sampleCount);
     VkDevice d = device->LogicalDevice();
     bool leftEye = (eye == 0);
-    VkImage& image = leftEye ? _lMsaaImage : _rMsaaImage;
-    VkDeviceMemory& memory = leftEye ? _lMsaaImageMemory : _rMsaaImageMemory;
-    VkImageView& imageView = leftEye ? _lMsaaView : _rMsaaView;
+    VkImage &image = leftEye ? _lMsaaImage : _rMsaaImage;
+    VkDeviceMemory &memory = leftEye ? _lMsaaImageMemory : _rMsaaImageMemory;
+    VkImageView &imageView = leftEye ? _lMsaaView : _rMsaaView;
     VK_CHECK_RESULT(vkCreateImage(d, &imageInfo, nullptr, &image));
 
     VkMemoryRequirements memoryRequirements;
     uint32_t memoryTypeIndex;
     VkMemoryAllocateInfo memoryAllocateInfo = MemoryAllocateInfo(image,
                                                                  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                                                                 *device, memoryRequirements,
+                                                                 *device,
+                                                                 memoryRequirements,
                                                                  memoryTypeIndex);
     VK_CHECK_RESULT(vkAllocateMemory(d, &memoryAllocateInfo, nullptr, &memory));
     VK_CHECK_RESULT(vkBindImageMemory(d, image, memory, 0));
 
-    VkImageViewCreateInfo imageViewInfo = ImageViewCreateInfo(image, colorFormat, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
+    VkImageViewCreateInfo imageViewInfo = ImageViewCreateInfo(image, colorFormat,
+                                                              {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1,
+                                                               0, 1});
     VK_CHECK_RESULT(vkCreateImageView(d, &imageViewInfo, nullptr, &imageView));
 }
 
 void StereoViewingSceneRenderer::BuildMSAADepthImage(RenderPass *msaaRenderPass, VkSampleCountFlagBits sampleCount, int eye)
 {
-    VkFormat depthFormat = ((MSAAWOPresentationRenderPass*)msaaRenderPass)->DepthFormat();
+    VkFormat depthFormat = ((MSAAShaderReadRenderPass*)msaaRenderPass)->DepthFormat();
     VkImageAspectFlags depthImageAspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
     if (depthFormat == VK_FORMAT_D16_UNORM_S8_UINT || depthFormat == VK_FORMAT_D24_UNORM_S8_UINT || depthFormat == VK_FORMAT_D32_SFLOAT_S8_UINT) {
         depthImageAspectFlags |= VK_IMAGE_ASPECT_STENCIL_BIT;
@@ -445,21 +446,24 @@ void StereoViewingSceneRenderer::BuildMSAADepthImage(RenderPass *msaaRenderPass,
                                                   sampleCount);
     VkDevice d = device->LogicalDevice();
     bool leftEye = (eye == 0);
-    VkImage& image = leftEye ? _lDepthImage : _rDepthImage;
-    VkDeviceMemory& memory = leftEye ? _lDepthImageMemory : _rDepthImageMemory;
-    VkImageView& view = leftEye ? _lDepthView : _rDepthView;
+    VkImage &image = leftEye ? _lDepthImage : _rDepthImage;
+    VkDeviceMemory &memory = leftEye ? _lDepthImageMemory : _rDepthImageMemory;
+    VkImageView &view = leftEye ? _lDepthView : _rDepthView;
     VK_CHECK_RESULT(vkCreateImage(d, &imageInfo, nullptr, &image));
 
     VkMemoryRequirements memoryRequirements;
     uint32_t memoryTypeIndex;
     VkMemoryAllocateInfo memoryAllocateInfo = MemoryAllocateInfo(image,
                                                                  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                                                                 *device, memoryRequirements,
+                                                                 *device,
+                                                                 memoryRequirements,
                                                                  memoryTypeIndex);
     VK_CHECK_RESULT(vkAllocateMemory(d, &memoryAllocateInfo, nullptr, &memory));
     VK_CHECK_RESULT(vkBindImageMemory(d, image, memory, 0));
 
-    VkImageViewCreateInfo imageViewInfo = ImageViewCreateInfo(image, depthFormat, { depthImageAspectFlags, 0, 1, 0, 1 });
+    VkImageViewCreateInfo imageViewInfo = ImageViewCreateInfo(image, depthFormat,
+                                                              {depthImageAspectFlags, 0, 1, 0,
+                                                               1});
     VK_CHECK_RESULT(vkCreateImageView(d, &imageViewInfo, nullptr, &view));
 }
 
@@ -703,8 +707,8 @@ void StereoViewingSceneRenderer::BuildMSAAPipeline(void* application, const Vert
     VK_CHECK_RESULT(vkCreateShaderModule(d, &fragModule, nullptr, &fragmentShader));
 
     VkPipelineShaderStageCreateInfo shaderStages[] = {
-        PipelineShaderStageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT, vertexShader),
-        PipelineShaderStageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader)
+            PipelineShaderStageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT, vertexShader),
+            PipelineShaderStageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader)
     };
 
     VkVertexInputBindingDescription vertexInputBinding = {};
@@ -792,8 +796,8 @@ void StereoViewingSceneRenderer::BuildMultiviewPipeline(void* application, const
     VK_CHECK_RESULT(vkCreateShaderModule(d, &fragModule, nullptr, &fragmentShader));
 
     VkPipelineShaderStageCreateInfo shaderStages[] = {
-        PipelineShaderStageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT, vertexShader),
-        PipelineShaderStageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader)
+            PipelineShaderStageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT, vertexShader),
+            PipelineShaderStageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader)
     };
 
     VkVertexInputBindingDescription vertexInputBinding = {};
@@ -869,9 +873,14 @@ void StereoViewingSceneRenderer::BuildMultiviewPipeline(void* application, const
 void StereoViewingSceneRenderer::BuildCommandBuffers(int index)
 {
     RenderPass* msaaRenderPass = renderPasses[0];
-    Command::BeginCommandBuffer(_commandBuffers.buffers[index], VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-
     const VkExtent2D& extent = swapchain->Extent();
+
+    Command::BeginCommandBuffer(_msaaCommandBuffers.buffers[index], VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+    // msaa
+    VkDeviceSize offsets[] = { 0 };
+    vkCmdBindVertexBuffers(_msaaCommandBuffers.buffers[index], 0, 1, &_modelResources[0].VertexBuffer().GetBuffer(), offsets);
+    vkCmdBindIndexBuffer(_msaaCommandBuffers.buffers[index], _modelResources[0].IndexBuffer().GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
     // left eye
     VkRenderPassBeginInfo lRenderPassBegin = {};
@@ -881,31 +890,35 @@ void StereoViewingSceneRenderer::BuildCommandBuffers(int index)
     lRenderPassBegin.renderArea.offset     = { 0, 0 };
     lRenderPassBegin.renderArea.extent     = extent;
     lRenderPassBegin.clearValueCount       = 2;
-
-    vector<VkClearValue> msaaClearValues = { { 0.03125f, 0.0625f, 0.15625f, 0.0f }, { 1.0f, 0 } };
+    vector<VkClearValue> msaaClearValues = { { 0.03125f, 0.0625f, 1.0f, 0.0f }, { 1.0f, 0 } };
     lRenderPassBegin.pClearValues = msaaClearValues.data();
-    vkCmdBeginRenderPass(_commandBuffers.buffers[index], &lRenderPassBegin, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBeginRenderPass(_msaaCommandBuffers.buffers[index], &lRenderPassBegin, VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBindPipeline(_commandBuffers.buffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, _msaaPipeline);
-    VkDeviceSize offsets[] = { 0 };
-    vkCmdBindVertexBuffers(_commandBuffers.buffers[index], 0, 1, &_modelResources[0].VertexBuffer().GetBuffer(), offsets);
-    vkCmdBindIndexBuffer(_commandBuffers.buffers[index], _modelResources[0].IndexBuffer().GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
+    vkCmdBindPipeline(_msaaCommandBuffers.buffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, _msaaPipeline);
     uint32_t dynamicOffsets = 0;
-    vkCmdBindDescriptorSets(_commandBuffers.buffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, _msaaPipelineLayout, 0, 1, &_msaaDescriptorSet, 1, &dynamicOffsets);
-    vkCmdDrawIndexed(_commandBuffers.buffers[index], _modelResources[0].IndicesCount(), 1, 0, 0, 0);
-    vkCmdEndRenderPass(_commandBuffers.buffers[index]);
+    vkCmdBindDescriptorSets(_msaaCommandBuffers.buffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, _msaaPipelineLayout, 0, 1, &_msaaDescriptorSet, 1, &dynamicOffsets);
+    vkCmdDrawIndexed(_msaaCommandBuffers.buffers[index], _modelResources[0].IndicesCount(), 1, 0, 0, 0);
+
+    vkCmdEndRenderPass(_msaaCommandBuffers.buffers[index]);
 
     // right eye
     VkRenderPassBeginInfo rRenderPassBegin = lRenderPassBegin;
     rRenderPassBegin.framebuffer = _rMsaaFramebuffers[index].GetFramebuffer();
-    vkCmdBeginRenderPass(_commandBuffers.buffers[index], &rRenderPassBegin, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBeginRenderPass(_msaaCommandBuffers.buffers[index], &rRenderPassBegin, VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBindPipeline(_commandBuffers.buffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, _msaaPipeline);
+    vkCmdBindPipeline(_msaaCommandBuffers.buffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, _msaaPipeline);
     dynamicOffsets = _dynamicBufferAlignment;
-    vkCmdBindDescriptorSets(_commandBuffers.buffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, _msaaPipelineLayout, 0, 1, &_msaaDescriptorSet, 1, &dynamicOffsets);
-    vkCmdDrawIndexed(_commandBuffers.buffers[index], _modelResources[0].IndicesCount(), 1, 0, 0, 0);
-    vkCmdEndRenderPass(_commandBuffers.buffers[index]);
+    vkCmdBindDescriptorSets(_msaaCommandBuffers.buffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, _msaaPipelineLayout, 0, 1, &_msaaDescriptorSet, 1, &dynamicOffsets);
+    vkCmdDrawIndexed(_msaaCommandBuffers.buffers[index], _modelResources[0].IndicesCount(), 1, 0, 0, 0);
 
+    vkCmdEndRenderPass(_msaaCommandBuffers.buffers[index]);
+
+    VK_CHECK_RESULT(vkEndCommandBuffer(_msaaCommandBuffers.buffers[index]));
+
+
+
+
+    Command::BeginCommandBuffer(_commandBuffers.buffers[index], VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
     // multiview
     vector<VkClearValue> multiviewClearValues = { { 0.0f, 0.0f, 0.0f, .0f } };
@@ -959,7 +972,7 @@ void StereoViewingSceneRenderer::BuildCommandBuffers(int index)
     scissor.extent.height = viewport.height;
     vkCmdSetScissor(_commandBuffers.buffers[index], 0, 1, &scissor);
 
-    vkCmdBindDescriptorSets(_commandBuffers.buffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, _multiviewPipelineLayout, 0, 1, _rDescriptorSets.data(), 0, nullptr);
+    vkCmdBindDescriptorSets(_commandBuffers.buffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, _multiviewPipelineLayout, 0, 1, &_rDescriptorSets[index], 0, nullptr);
     vkCmdDrawIndexed(_commandBuffers.buffers[index], _modelResources[1].IndicesCount(), 1, 0, 0, 0);
 
     vkCmdEndRenderPass(_commandBuffers.buffers[index]);
@@ -974,7 +987,9 @@ void StereoViewingSceneRenderer::RebuildSwapchain()
     uint32_t concurrentFramesCount = swapchain->ConcurrentFramesCount();
     vkWaitForFences(d, concurrentFramesCount, multiFrameFences.data(), true, UINT64_MAX);
     vkResetFences(d, concurrentFramesCount, multiFrameFences.data());
+
     currentFrameIndex = 0;
+    currentFrameToImageindex.clear();
 
     DeleteSwapchainWithDependencies();
 

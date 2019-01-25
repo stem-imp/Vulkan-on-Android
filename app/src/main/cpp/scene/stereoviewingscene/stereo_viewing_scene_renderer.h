@@ -85,6 +85,8 @@ private:
 
     void* _application;
 
+    vector<VkFence> msaaFences;
+
     vector<ModelResource>           _modelResources;
     vector<Texture2D>               _modelTextures;
     vector<Texture::TextureAttribs> _textureAttribsGroup;
@@ -121,6 +123,7 @@ private:
     VkPipeline       _msaaPipeline            = VK_NULL_HANDLE;
     VkPipeline       _multiviewPipeline       = VK_NULL_HANDLE;
 
+    Command::CommandBuffers _msaaCommandBuffers;
     Command::CommandBuffers _commandBuffers;
 };
 

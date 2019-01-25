@@ -15,6 +15,7 @@ namespace Vulkan
 
     protected:
         void CreateRenderPassFlow(VkImageLayout finalLayout, VkImageLayout resolvedFinalLayout);
+
     private:
         virtual void CreateRenderPassImpl() override;
 
