@@ -552,7 +552,10 @@ void StereoViewingSceneRenderer::BuildMSAADescriptorSetLayout()
     VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device->LogicalDevice(), &layoutInfo, nullptr, &_msaaDescriptorSetLayout));
 
     // Prepare pipeline layout.
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = PipelineLayoutCreateInfo(1, &_msaaDescriptorSetLayout, 0, nullptr);
+    VkPushConstantRange pushConstantRange = {};
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pushConstantRange.size = sizeof(BlinnPhongLighting);
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = PipelineLayoutCreateInfo(1, &_msaaDescriptorSetLayout, 1, &pushConstantRange);
     VK_CHECK_RESULT(vkCreatePipelineLayout(device->LogicalDevice(), &pipelineLayoutInfo, nullptr, &_msaaPipelineLayout));
 }
 
@@ -707,8 +710,8 @@ void StereoViewingSceneRenderer::BuildMSAAPipeline(void* application, const Vert
     VK_CHECK_RESULT(vkCreateShaderModule(d, &fragModule, nullptr, &fragmentShader));
 
     VkPipelineShaderStageCreateInfo shaderStages[] = {
-            PipelineShaderStageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT, vertexShader),
-            PipelineShaderStageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader)
+        PipelineShaderStageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT, vertexShader),
+        PipelineShaderStageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader)
     };
 
     VkVertexInputBindingDescription vertexInputBinding = {};
@@ -876,6 +879,13 @@ void StereoViewingSceneRenderer::BuildCommandBuffers(int index)
     const VkExtent2D& extent = swapchain->Extent();
 
     Command::BeginCommandBuffer(_msaaCommandBuffers.buffers[index], VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+    vkCmdPushConstants(_msaaCommandBuffers.buffers[index],
+                       _msaaPipelineLayout,
+                       VK_SHADER_STAGE_VERTEX_BIT,
+                       0,
+                       sizeof(BlinnPhongLighting),
+                       &lighting);
 
     // msaa
     VkDeviceSize offsets[] = { 0 };

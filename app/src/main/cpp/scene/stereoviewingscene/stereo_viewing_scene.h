@@ -36,7 +36,7 @@ private:
     float _eyeSeparation;
 
     // ==== Vulkan ==== //
-    vector<Model>           _models;
+    vector<Model> _models;
     vector<mat4>  _modelTransforms;
     ViewProjectionTransform _lViewProjTransform;
     ViewProjectionTransform _rViewProjTransform;

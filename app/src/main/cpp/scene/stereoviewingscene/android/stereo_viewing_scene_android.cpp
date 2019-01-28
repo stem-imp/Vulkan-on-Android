@@ -177,7 +177,7 @@ bool StereoViewingScene::UpdateImpl()
     StereoViewingSceneRenderer* concreteRenderer = (StereoViewingSceneRenderer*)renderer;
     auto now = high_resolution_clock::now();
     float elapsedTime = duration<float, seconds::period>(now - startTime).count();
-    _modelTransforms[0] = glm::rotate(mat4(1.0f), glm::radians(elapsedTime * 1024.0f), vec3(1.5f, 0.5f, -1.0f));
+    _modelTransforms[0] = glm::rotate(mat4(1.0f), glm::radians(elapsedTime * 16.0f), vec3(1.5f, 0.5f, -1.0f));
 
     float aspectRatio = (_screenWidth * 0.5f) / _screenHeight;
     float wd2 = _zNear * tan(glm::radians(_fov / 2.0f));
@@ -200,6 +200,10 @@ bool StereoViewingScene::UpdateImpl()
 
     vector<int> modelTransformSizes = { sizeof(mat4) };
     concreteRenderer->UpdateUniformBuffers(_modelTransforms, modelTransformSizes, _lViewProjTransform, _rViewProjTransform, sizeof(ViewProjectionTransform));
+
+    concreteRenderer->lighting.cameraPosInWorldSpace = vec3(0, 0, 24);
+    concreteRenderer->lighting.lightPosInWorldSpace = vec3(-36, 0, 24);
+
     return true;
 }
 

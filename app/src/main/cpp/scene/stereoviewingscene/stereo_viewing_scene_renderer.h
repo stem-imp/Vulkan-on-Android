@@ -46,16 +46,13 @@ public:
 
     void BuildCommandBuffers(int index);
 
-    //========================temp
-//    void BuildTempDescriptorSetLayout(void* app);
-//    void BuildTempGraphicsPipeline();
-    //========================temp
-
     VkSampleCountFlagBits SampleCount() { return _sampleCount; }
 
     void SetVertexLayouts(vector<VertexLayout>&& vertexLayouts) { _vertexLayouts = std::forward<vector<VertexLayout>>(vertexLayouts); }
 
     const vector<Vulkan::RenderPass*>& RenderPasses() const { return renderPasses; }
+
+    BlinnPhongLighting lighting;
 
 //    typedef struct MVP {
 //        mat4 model;
@@ -63,11 +60,6 @@ public:
 //        mat4 projection;
 //        mat4 mInvTranspose;
 //    } MVP;
-
-    typedef struct Lighting {
-        vec3 worldSpaceCameraPos;
-        alignas(16) vec3 worldSpaceLightPos;
-    } Lighting;
 
 //    vector<Model> models;
 private:

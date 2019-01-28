@@ -1,8 +1,10 @@
 ﻿#ifndef DATA_TYPE_H
 #define DATA_TYPE_H
 
+#include <glm/vec3.hpp>
 #include <glm/mat4x4.hpp>
 
+using glm::vec3;
 using glm::mat4;
 
 typedef struct Extent2D {
@@ -19,5 +21,10 @@ typedef struct ViewProjectionTransform {
     mat4 view;
     mat4 projection;
 } ViewProjectionTransform;
+
+typedef struct BlinnPhongLighting {
+    vec3 cameraPosInWorldSpace;
+    alignas(16) vec3 lightPosInWorldSpace;
+} BlinnPhongLighting;
 
 #endif // DATA_TYPE_H
