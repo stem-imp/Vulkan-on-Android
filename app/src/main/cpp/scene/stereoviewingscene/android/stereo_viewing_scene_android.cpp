@@ -4,7 +4,9 @@
 #include "../stereo_viewing_scene_renderer.h"
 #include <android_native_app_glue.h>
 #include "../../../log/log.h"
+#include "glm/matrix.hpp"
 #include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtc/type_ptr.hpp"
 
 using Vulkan::ModelCreateInfo;
 using std::chrono::duration;
@@ -111,6 +113,7 @@ StereoViewingScene::StereoViewingScene(void* state) : Scene(state),
         renderer->ChangeOrientation();
     };
     eventLoop.onLowMemory = OnLowMemory;
+    eventLoop.onGetRotationVector = std::bind(&StereoViewingScene::OnGetRotationVector, this, std::placeholders::_1);
 
     android_app* app = (android_app*)state;
     _models.emplace_back(Model());
@@ -191,15 +194,30 @@ bool StereoViewingScene::UpdateImpl()
     float bottom = -wd2;
     float viewZ = 24.0;
 
+    if (cameraRotationMatrix.size() > 0) {
+        mat4 cameraRotation = glm::make_mat4(&cameraRotationMatrix[0]);
+        mat4 eye = glm::translate(mat4(1.0f), vec3(-0.5f * _eyeSeparation, 0.0f, viewZ));
+        _lViewProjTransform.view = glm::transpose(cameraRotation) * glm::inverse(eye);
+    } else {
+        _lViewProjTransform.view = lookAt(vec3(-0.5f * _eyeSeparation, 0.0f, viewZ), vec3(-0.5f * _eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    }
+
     left = -aspectRatio * wd2 + 0.5f * _eyeSeparation * ndfl;
     right = aspectRatio * wd2 + 0.5f * _eyeSeparation * ndfl;
-    _lViewProjTransform.view = lookAt(vec3(-0.5f * _eyeSeparation, 0.0f, viewZ), vec3(-0.5f * _eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
     _lViewProjTransform.projection = glm::frustum(left, right, bottom, top, _zNear, _zFar);
     _lViewProjTransform.projection[1][1] *= -1;
 
+
+    if (cameraRotationMatrix.size() > 0) {
+        mat4 cameraRotation = glm::make_mat4(&cameraRotationMatrix[0]);
+        mat4 eye = glm::translate(mat4(1.0f), vec3(0.5f * _eyeSeparation, 0.0f, viewZ));
+        _rViewProjTransform.view = glm::transpose(cameraRotation) * glm::inverse(eye);
+    } else {
+        _rViewProjTransform.view = lookAt(vec3(0.5f * _eyeSeparation, 0.0f, viewZ), vec3(0.5f * _eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    }
+
     left = -aspectRatio * wd2 - 0.5f * _eyeSeparation * ndfl;
     right = aspectRatio * wd2 - 0.5f * _eyeSeparation * ndfl;
-    _rViewProjTransform.view = lookAt(vec3(0.5f * _eyeSeparation, 0.0f, viewZ), vec3(0.5f * _eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
     _rViewProjTransform.projection = glm::frustum(left, right, bottom, top, _zNear, _zFar);
     _rViewProjTransform.projection[1][1] *= -1;
 
@@ -210,6 +228,21 @@ bool StereoViewingScene::UpdateImpl()
     concreteRenderer->lighting.lightPosInWorldSpace = vec3(-36, 0, viewZ);
 
     return true;
+}
+
+void StereoViewingScene::UpdateDeviceOrientation(const float rotationMatrix[], bool columnMajorInput)
+{
+    cameraRotationMatrix.resize(16);
+    if (columnMajorInput) {
+        std::copy(rotationMatrix, rotationMatrix + 16, &cameraRotationMatrix[0]);
+    } else {
+        for (int i = 0; i < 4; i++) {
+            cameraRotationMatrix[i * 4] = rotationMatrix[i + 0];
+            cameraRotationMatrix[i * 4 + 1] = rotationMatrix[i + 4];
+            cameraRotationMatrix[i * 4 + 2] = rotationMatrix[i + 8];
+            cameraRotationMatrix[i * 4 + 3] = rotationMatrix[i + 12];
+        }
+    }
 }
 
 bool OnActivate()

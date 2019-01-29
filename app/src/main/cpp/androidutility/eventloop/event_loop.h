@@ -1,6 +1,7 @@
 #ifndef ANDROID_EVENT_LOOP_HPP
 #define ANDROID_EVENT_LOOP_HPP
 
+#include <android/sensor.h>
 #include <android_native_app_glue.h>
 #include <functional>
 
@@ -31,6 +32,10 @@ namespace AndroidNative {
 
         function<void(android_app *)> onConfigurationChanged;
         function<void(void)> onLowMemory;
+
+        function<void(float rotationVector[])> onGetRotationVector;
+
+        ASensorEventQueue* rotationVectorEventQueue;
     private:
         void Activate();
         void Deactivate();
@@ -40,6 +45,9 @@ namespace AndroidNative {
         android_app* _application;
         bool _enabled;
         bool _quit;
+
+        ASensorManager* _sensorManager;
+        const ASensor* _rotationVector;
     };
 }
 
