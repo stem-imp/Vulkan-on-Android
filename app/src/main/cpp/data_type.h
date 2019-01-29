@@ -25,6 +25,10 @@ typedef struct ViewProjectionTransform {
 typedef struct BlinnPhongLighting {
     vec3 cameraPosInWorldSpace;
     alignas(16) vec3 lightPosInWorldSpace;
+    alignas(16) vec3 ambientLight;
+    alignas(16) vec3 diffuseLight;
+    alignas(16) vec3 specularLight;
+    alignas(16) float shininess;
 } BlinnPhongLighting;
 
 #endif // DATA_TYPE_H

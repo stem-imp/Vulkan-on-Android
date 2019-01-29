@@ -79,6 +79,10 @@ StereoViewingScene::StereoViewingScene(void* state) : Scene(state),
         vertexLayout.components.push_back(Vulkan::VertexComponent::VERTEX_COMPONENT_POSITION);
         concreteRenderer->BuildMultiviewPipeline(app, vertexLayout);
         concreteRenderer->SetVertexLayouts({ _models[0].VertexLayouts()[0], vertexLayout });
+        concreteRenderer->lighting.ambientLight = vec3(0.125);
+        concreteRenderer->lighting.diffuseLight = vec3(0.875);
+        concreteRenderer->lighting.specularLight = vec3(0.125, 0.125, 0.75);
+        concreteRenderer->lighting.shininess = 64;
 
         OnInitWindow(app);
 
@@ -185,24 +189,25 @@ bool StereoViewingScene::UpdateImpl()
     float left, right;
     float top = wd2;
     float bottom = -wd2;
+    float viewZ = 24.0;
 
     left = -aspectRatio * wd2 + 0.5f * _eyeSeparation * ndfl;
     right = aspectRatio * wd2 + 0.5f * _eyeSeparation * ndfl;
-    _lViewProjTransform.view = lookAt(vec3(-0.5f * _eyeSeparation, 0.0f, 24.0f), vec3(-0.5f * _eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    _lViewProjTransform.view = lookAt(vec3(-0.5f * _eyeSeparation, 0.0f, viewZ), vec3(-0.5f * _eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
     _lViewProjTransform.projection = glm::frustum(left, right, bottom, top, _zNear, _zFar);
     _lViewProjTransform.projection[1][1] *= -1;
 
     left = -aspectRatio * wd2 - 0.5f * _eyeSeparation * ndfl;
     right = aspectRatio * wd2 - 0.5f * _eyeSeparation * ndfl;
-    _rViewProjTransform.view = lookAt(vec3(0.5f * _eyeSeparation, 0.0f, 24.0f), vec3(0.5f * _eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+    _rViewProjTransform.view = lookAt(vec3(0.5f * _eyeSeparation, 0.0f, viewZ), vec3(0.5f * _eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
     _rViewProjTransform.projection = glm::frustum(left, right, bottom, top, _zNear, _zFar);
     _rViewProjTransform.projection[1][1] *= -1;
 
     vector<int> modelTransformSizes = { sizeof(mat4) };
     concreteRenderer->UpdateUniformBuffers(_modelTransforms, modelTransformSizes, _lViewProjTransform, _rViewProjTransform, sizeof(ViewProjectionTransform));
 
-    concreteRenderer->lighting.cameraPosInWorldSpace = vec3(0, 0, 24);
-    concreteRenderer->lighting.lightPosInWorldSpace = vec3(-36, 0, 24);
+    concreteRenderer->lighting.cameraPosInWorldSpace = vec3(0, 0, viewZ);
+    concreteRenderer->lighting.lightPosInWorldSpace = vec3(-36, 0, viewZ);
 
     return true;
 }

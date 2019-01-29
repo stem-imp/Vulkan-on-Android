@@ -12,6 +12,10 @@ layout(binding = 1) uniform ViewProjectionTransform {
 layout(push_constant) uniform Lighting {
 	vec3 cameraPosInWorldSpace;
 	layout(offset = 16) vec3 lightPosInWorldSpace;
+	layout(offset = 32) vec3 ambientLight;
+	layout(offset = 48) vec3 diffuseLight;
+	layout(offset = 64) vec3 specularLight;
+	layout(offset = 80) float shininess;
 } lighting;
 
 layout(location = 0) in vec3 inPosition;
