@@ -119,14 +119,22 @@ StereoViewingScene::StereoViewingScene(void* state) : Scene(state),
     _models.emplace_back(Model());
     _modelTransforms.emplace_back(mat4(1.0));
     Model& model = _models[0];
-    string filePath = string(app->activity->externalDataPath) + string("/earth/");
+    string filePath = string(app->activity->externalDataPath) + string("/the-upper-vestibule/");
     //Texture::TextureAttribs textureAttribs;
-    ModelCreateInfo modelCreateInfo = { 0.001953125f, 1.0f, true, false };
-    if (model.ReadFile(filePath, string("earth.obj"), Model::DEFAULT_READ_FILE_FLAGS, &modelCreateInfo)) {
+    ModelCreateInfo modelCreateInfo = { 0.5f, 1.0f, true, true };
+    unsigned int flags = aiProcess_Triangulate |
+                         aiProcess_ValidateDataStructure |
+                         aiProcess_RemoveRedundantMaterials |
+                         aiProcess_FindDegenerates |
+                         aiProcess_FindInvalidData |
+                         aiProcess_OptimizeMeshes |
+                         aiProcess_OptimizeGraph |
+                         aiProcess_FlipUVs;
+    if (model.ReadFile(filePath, string("model.obj"), flags, &modelCreateInfo)) {
         //_modelResources.emplace_back(*device);
         //_modelResources[_modelResources.size() - 1].UploadToGPU(model, *command);
     } else {
-        Log::Error("%s: file not found.", (filePath + string("earth.obj")).c_str());
+        Log::Error("%s: file not found.", (filePath + string("model.obj")).c_str());
         _models.pop_back();
     }
 
@@ -184,7 +192,7 @@ bool StereoViewingScene::UpdateImpl()
     StereoViewingSceneRenderer* concreteRenderer = (StereoViewingSceneRenderer*)renderer;
     auto now = high_resolution_clock::now();
     float elapsedTime = duration<float, seconds::period>(now - startTime).count();
-    _modelTransforms[0] = glm::rotate(mat4(1.0f), glm::radians(elapsedTime * 16.0f), vec3(1.5f, 0.5f, -1.0f));
+    _modelTransforms[0] = glm::rotate(mat4(1.0f), glm::radians(elapsedTime * 0.0f), vec3(1.5f, 0.5f, -1.0f));
 
     float aspectRatio = (_screenWidth * 0.5f) / _screenHeight;
     float wd2 = _zNear * tan(glm::radians(_fov / 2.0f));
@@ -192,11 +200,12 @@ bool StereoViewingScene::UpdateImpl()
     float left, right;
     float top = wd2;
     float bottom = -wd2;
-    float viewZ = 24.0;
+    float viewY = 10.0f;
+    float viewZ = -1.0;
 
     if (cameraRotationMatrix.size() > 0) {
         mat4 cameraRotation = glm::make_mat4(&cameraRotationMatrix[0]);
-        mat4 eye = glm::translate(mat4(1.0f), vec3(-0.5f * _eyeSeparation, 0.0f, viewZ));
+        mat4 eye = glm::translate(mat4(1.0f), vec3(-0.5f * _eyeSeparation, viewY, viewZ));
         _lViewProjTransform.view = glm::transpose(cameraRotation) * glm::inverse(eye);
     } else {
         _lViewProjTransform.view = lookAt(vec3(-0.5f * _eyeSeparation, 0.0f, viewZ), vec3(-0.5f * _eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
@@ -210,7 +219,7 @@ bool StereoViewingScene::UpdateImpl()
 
     if (cameraRotationMatrix.size() > 0) {
         mat4 cameraRotation = glm::make_mat4(&cameraRotationMatrix[0]);
-        mat4 eye = glm::translate(mat4(1.0f), vec3(0.5f * _eyeSeparation, 0.0f, viewZ));
+        mat4 eye = glm::translate(mat4(1.0f), vec3(0.5f * _eyeSeparation, viewY, viewZ));
         _rViewProjTransform.view = glm::transpose(cameraRotation) * glm::inverse(eye);
     } else {
         _rViewProjTransform.view = lookAt(vec3(0.5f * _eyeSeparation, 0.0f, viewZ), vec3(0.5f * _eyeSeparation, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));

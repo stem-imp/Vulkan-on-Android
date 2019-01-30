@@ -8,7 +8,7 @@ namespace Vulkan
     void Texture2D::BuildTexture2D(TextureAttribs& textureAttribs, uint8_t* data, VkMemoryPropertyFlags preferredProperties, Command& command)
     {
         Buffer stagingBuffer(device);
-        size_t size = textureAttribs.width * textureAttribs.height * textureAttribs.channelsPerPixel;
+        size_t size = textureAttribs.width * textureAttribs.height * 4;//textureAttribs.channelsPerPixel;
         stagingBuffer.BuildDefaultBuffer(size,
                                          VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
@@ -58,19 +58,24 @@ namespace Vulkan
     void Texture2D::CreateTexure2D(TextureAttribs& textureAttribs)
     {
         vector<VkFormat> formats;
-        if (textureAttribs.channelsPerPixel == 3) {
-            if (textureAttribs.sRGB) {
-                formats.push_back(VK_FORMAT_R8G8B8_SRGB);
-            } else {
-                formats.push_back(VK_FORMAT_R8G8B8_UNORM);
-            }
-        } else if (textureAttribs.channelsPerPixel == 4) {
-            if (textureAttribs.sRGB) {
-                formats.push_back(VK_FORMAT_R8G8B8A8_SRGB);
-            } else {
-                formats.push_back(VK_FORMAT_R8G8B8A8_UNORM);
-            }
+        if (textureAttribs.sRGB) {
+            formats.push_back(VK_FORMAT_R8G8B8A8_SRGB);
+        } else {
+            formats.push_back(VK_FORMAT_R8G8B8A8_UNORM);
         }
+//        if (textureAttribs.channelsPerPixel == 3) {
+//            if (textureAttribs.sRGB) {
+//                formats.push_back(VK_FORMAT_R8G8B8_SRGB);
+//            } else {
+//                formats.push_back(VK_FORMAT_R8G8B8_UNORM);
+//            }
+//        } else if (textureAttribs.channelsPerPixel == 4) {
+//            if (textureAttribs.sRGB) {
+//                formats.push_back(VK_FORMAT_R8G8B8A8_SRGB);
+//            } else {
+//                formats.push_back(VK_FORMAT_R8G8B8A8_UNORM);
+//            }
+//        }
         textureAttribs.format = FindDeviceSupportedFormat(formats,
                                                           VK_IMAGE_TILING_OPTIMAL,
                                                           VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT,
