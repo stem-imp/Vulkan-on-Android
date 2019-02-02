@@ -552,10 +552,11 @@ void StereoViewingSceneRenderer::BuildMSAADescriptorSetLayout()
     VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device->LogicalDevice(), &layoutInfo, nullptr, &_msaaDescriptorSetLayout));
 
     // Prepare pipeline layout.
-    VkPushConstantRange pushConstantRange = {};
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    pushConstantRange.size = sizeof(BlinnPhongLighting);
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = PipelineLayoutCreateInfo(1, &_msaaDescriptorSetLayout, 1, &pushConstantRange);
+//    VkPushConstantRange pushConstantRange = {};
+//    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+//    pushConstantRange.size = sizeof(BlinnPhongLighting);
+//    VkPipelineLayoutCreateInfo pipelineLayoutInfo = PipelineLayoutCreateInfo(1, &_msaaDescriptorSetLayout, 1, &pushConstantRange);
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = PipelineLayoutCreateInfo(1, &_msaaDescriptorSetLayout, 0, nullptr);
     VK_CHECK_RESULT(vkCreatePipelineLayout(device->LogicalDevice(), &pipelineLayoutInfo, nullptr, &_msaaPipelineLayout));
 }
 
@@ -839,7 +840,7 @@ void StereoViewingSceneRenderer::BuildMultiviewPipeline(void* application, const
     multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
     multisample.sampleShadingEnable = VK_FALSE;
 
-    VkPipelineDepthStencilStateCreateInfo depthStencil = DepthStencil();
+    VkPipelineDepthStencilStateCreateInfo depthStencil = DepthStencil(VK_FALSE, VK_FALSE);
 
     VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
     colorBlendAttachment.colorWriteMask                      = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -880,12 +881,12 @@ void StereoViewingSceneRenderer::BuildCommandBuffers(int index)
 
     Command::BeginCommandBuffer(_msaaCommandBuffers.buffers[index], VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-    vkCmdPushConstants(_msaaCommandBuffers.buffers[index],
-                       _msaaPipelineLayout,
-                       VK_SHADER_STAGE_VERTEX_BIT,
-                       0,
-                       sizeof(BlinnPhongLighting),
-                       &lighting);
+//    vkCmdPushConstants(_msaaCommandBuffers.buffers[index],
+//                       _msaaPipelineLayout,
+//                       VK_SHADER_STAGE_VERTEX_BIT,
+//                       0,
+//                       sizeof(BlinnPhongLighting),
+//                       &lighting);
 
     // msaa
     VkDeviceSize offsets[] = { 0 };
