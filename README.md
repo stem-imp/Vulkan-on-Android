@@ -1,4 +1,5 @@
 # Vulkan on Android
+A variety of demo scenes demonstrating how Vulkan can be used.
 
 ## Dependencies
 * GLM 0.9.9.3
